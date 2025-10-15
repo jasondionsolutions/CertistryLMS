@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: 📦 Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: 🧠 TypeScript check
+        run: yarn typecheck
+
+      - name: 🔍 Lint
+        run: yarn lint
+
+      - name: 🚧 Build Next.js
+        run: yarn build
+
+      # Optional: Playwright tests
+      - name: 🧪 Playwright tests
+        run: yarn test
+        env:
+          CI: true
