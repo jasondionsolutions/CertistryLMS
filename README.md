@@ -1,5 +1,6 @@
 # 🎓 CertistryLMS - AI-First Certification Learning Management System
 
+[![CI](https://github.com/jasondionsolutions/CertistryLMS/actions/workflows/ci.yml/badge.svg)](https://github.com/jasondionsolutions/CertistryLMS/actions/workflows/ci.yml)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=nextdotjs&logoColor=white)](https://nextjs.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-4.0-38BDF8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Playwright](https://img.shields.io/badge/Tested%20with-Playwright-45ba63?logo=playwright&logoColor=white)](https://playwright.dev)
@@ -49,13 +50,167 @@ An **AI-powered Learning Management System** designed specifically for professio
 ## 🚀 Getting Started
 
 ```bash
-yarn install        # install dependencies
-yarn dev            # start dev server (Turbopack)
-yarn build          # production build
-yarn lint           # run ESLint
-yarn typecheck      # run TypeScript checks
-yarn test           # run Playwright e2e tests
+yarn install            # install dependencies
+yarn dev                # start dev server (Turbopack)
+yarn build              # production build
+yarn lint               # run ESLint
+yarn typecheck          # run TypeScript checks
+yarn test               # run Playwright e2e tests
+yarn test:unit          # run Jest unit tests
+yarn test:unit:watch    # run Jest in watch mode
+yarn test:unit:coverage # run Jest with coverage
+yarn test:all           # run both unit and e2e tests
 ```
+
+---
+
+## 🚢 Deployment
+
+### Platform: Vercel
+
+The application is deployed on Vercel with automatic deployments configured for multiple environments:
+
+- **Production**: `main` branch → [Production URL]
+- **Staging**: `staging` branch → [Staging URL]
+- **Preview**: Pull requests → Automatic preview deployments
+
+### Branch Workflow
+
+```bash
+# Local development
+git checkout main
+git pull origin main
+# Make changes, commit
+
+# Deploy to staging
+git checkout staging
+git merge main
+git push origin staging
+# Vercel automatically deploys to staging environment
+
+# Deploy to production (after staging verification)
+git checkout main
+git push origin main
+# Vercel automatically deploys to production environment
+```
+
+### Environment Variables Setup
+
+Required environment variables must be configured in Vercel dashboard:
+
+1. Go to Vercel Dashboard → Project Settings → Environment Variables
+2. Add the following secrets (refer to `.env.example` for descriptions):
+
+**Database (Neon.tech)**:
+- `DATABASE_URL` - Pooled connection string
+- `DIRECT_URL` - Direct connection string for migrations
+
+**Authentication (AWS Cognito)**:
+- `AWS_REGION` - AWS region (e.g., us-east-1)
+- `COGNITO_USER_POOL_ID` - Cognito User Pool ID
+- `COGNITO_CLIENT_ID` - Cognito App Client ID
+- `NEXTAUTH_SECRET` - Session encryption secret (generate with: `openssl rand -base64 32`)
+
+**File Storage (AWS S3)**:
+- `AWS_S3_REGION` - S3 bucket region
+- `AWS_S3_BUCKET_NAME` - S3 bucket name
+- `AWS_S3_ACCESS_KEY_ID` - IAM user access key
+- `AWS_S3_SECRET_ACCESS_KEY` - IAM user secret key
+- `AWS_S3_FOLDER` - Environment folder (dev/staging/prod)
+
+**Public Variables** (set for all environments):
+- `NEXT_PUBLIC_APP_NAME` - Application name (CertistryLMS)
+- `NEXT_PUBLIC_APP_URL` - Application URL (auto-set by Vercel)
+
+### Branch-Specific Environment Variables
+
+Configure different values per environment:
+
+- **Production** (`main` branch):
+  - `AWS_S3_FOLDER=prod`
+  - Use production Neon branch database
+
+- **Staging** (`staging` branch):
+  - `AWS_S3_FOLDER=staging`
+  - Use staging Neon branch database
+
+- **Preview** (PR deployments):
+  - `AWS_S3_FOLDER=dev`
+  - Use development Neon branch database
+
+### Database Branching (Neon.tech)
+
+Neon supports database branching for preview deployments:
+
+1. Create database branches in Neon dashboard for staging/preview
+2. Configure branch-specific `DATABASE_URL` in Vercel
+3. Each preview deployment can use isolated database branch
+
+### Health Check
+
+Monitor deployment health at `/api/health`:
+
+```bash
+curl https://your-domain.vercel.app/api/health
+```
+
+Response includes:
+- System status
+- Database connectivity
+- Service configuration
+- Response time metrics
+
+### CI/CD Pipeline
+
+GitHub Actions runs on every push and PR:
+
+1. ✅ TypeScript type checking
+2. ✅ ESLint code quality checks
+3. ✅ Jest unit tests
+4. ✅ Next.js production build
+5. ✅ Playwright e2e tests
+
+All checks must pass before merging to `main` or `staging`.
+
+### Manual Deployment Steps (First Time)
+
+1. **Connect Repository to Vercel**:
+   - Import project from GitHub
+   - Select `jasondionsolutions/CertistryLMS`
+   - Configure production branch: `main`
+
+2. **Configure Environment Variables**:
+   - Add all required secrets (see above)
+   - Set production values for `main` branch
+   - Set staging values for `staging` branch
+
+3. **Configure Branch Deployments**:
+   - Enable automatic deployments for `main` and `staging`
+   - Enable preview deployments for pull requests
+   - Configure build settings (handled by `vercel.json`)
+
+4. **Set Up Database**:
+   - Create Neon branches for staging/preview
+   - Configure connection strings per environment
+   - Run migrations: `yarn db:push`
+
+5. **Verify Deployment**:
+   - Check health endpoint: `/api/health`
+   - Test authentication flow
+   - Verify S3 file uploads
+   - Run smoke tests
+
+### Deployment Checklist
+
+Before deploying to production:
+
+- [ ] All tests passing locally (`yarn test:all`)
+- [ ] Build succeeds (`yarn build`)
+- [ ] Changes tested on staging environment
+- [ ] Database migrations applied
+- [ ] Environment variables configured
+- [ ] Health check endpoint responding
+- [ ] CI/CD pipeline passing
 
 ---
 

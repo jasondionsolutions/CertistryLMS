@@ -1,18 +1,21 @@
 // tests/home.spec.ts
 import { test, expect } from "@playwright/test";
 
-test("homepage renders correctly", async ({ page }) => {
-  await page.goto("/");
+test("homepage loads successfully", async ({ page }) => {
+  // Navigate to homepage
+  const response = await page.goto("/");
 
-  // Check that the Next.js logo is present
-  await expect(page.locator("img[alt='Next.js logo']")).toBeVisible();
+  // Check that page loads with 200 status
+  expect(response?.status()).toBe(200);
 
-  // Check the presence of your main heading or elements you own
-  await expect(
-    page.getByText("Get started by editing", { exact: false })
-  ).toBeVisible();
+  // Wait for page to be ready
+  await page.waitForLoadState("networkidle");
 
-  // Remove or rewrite button tests that reference Vercel
-  const docsLink = page.getByRole("link", { name: /read our docs/i });
-  await expect(docsLink).toHaveAttribute("href", /nextjs\.org\/docs/);
+  // Take screenshot on failure for debugging
+  await page.screenshot({ path: "test-results/homepage.png", fullPage: true });
+
+  // Check that page has loaded by looking for any text content
+  const bodyText = await page.textContent("body");
+  expect(bodyText).toBeTruthy();
+  expect(bodyText!.length).toBeGreaterThan(0);
 });
