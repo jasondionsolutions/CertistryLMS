@@ -12,23 +12,72 @@ import { prisma } from "@/lib/prisma";
  */
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   admin: [
+    // General permissions
     "read",
     "write",
     "delete",
+
+    // User management
     "users.manage",
+    "users.create",
+    "users.update",
+    "users.delete",
+    "users.read",
+
+    // Certification management
+    "certifications.read",
+    "certifications.create",
+    "certifications.update",
+    "certifications.delete",
     "certifications.manage",
+
+    // Content management
+    "content.read",
+    "content.create",
+    "content.update",
+    "content.delete",
     "content.manage",
+
+    // Analytics
     "analytics.view",
+    "analytics.manage",
   ],
   instructor: [
+    // General permissions
     "read",
     "write",
+
+    // Certification access
+    "certifications.read",
+    "certifications.create",
+    "certifications.update",
+
+    // Content management
+    "content.read",
     "content.create",
+    "content.update",
     "content.edit",
+
+    // Student management
     "students.view",
+    "students.read",
+
+    // Analytics
     "analytics.view",
   ],
-  user: ["read", "content.view", "progress.manage"],
+  user: [
+    // Basic read access
+    "read",
+
+    // Content viewing
+    "content.view",
+    "content.read",
+
+    // Own progress management
+    "progress.manage",
+    "progress.read",
+    "progress.update",
+  ],
 };
 
 /**

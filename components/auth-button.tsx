@@ -39,7 +39,7 @@ export function AuthButton() {
 
   return (
     <Button onClick={() => signIn("cognito")} variant="default">
-      Sign In with Cognito
+      Sign In
     </Button>
   );
 }

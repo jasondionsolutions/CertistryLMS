@@ -19,9 +19,9 @@ import {
  *
  * This utility provides methods for:
  * - Creating users programmatically
- * - Updating user attributes (including custom:role)
+ * - Updating user attributes
  * - Deleting and disabling users
- * - Managing user groups
+ * - Managing user groups (roles are assigned via Cognito groups)
  * - Setting permanent passwords
  */
 
@@ -46,6 +46,7 @@ export interface CreateUserInput {
 
 /**
  * Create a new user in Cognito
+ * Note: Role assignment happens via Cognito groups (use addUserToGroup after creation)
  */
 export async function createCognitoUser(input: CreateUserInput) {
   const {
@@ -66,9 +67,6 @@ export async function createCognitoUser(input: CreateUserInput) {
     userAttributes.push({ Name: "name", Value: name });
   }
 
-  // Add custom role attribute
-  userAttributes.push({ Name: "custom:role", Value: role });
-
   const command = new AdminCreateUserCommand({
     UserPoolId: USER_POOL_ID,
     Username: username, // Use provided username instead of email
@@ -80,11 +78,18 @@ export async function createCognitoUser(input: CreateUserInput) {
 
   try {
     const response = await cognitoClient.send(command);
+    const createdUsername = response.User?.Username;
+    const userSub = response.User?.Attributes?.find((attr) => attr.Name === "sub")?.Value;
+
+    // Add user to the appropriate Cognito group for role assignment
+    if (createdUsername && role) {
+      await addUserToGroup(createdUsername, role);
+    }
+
     return {
       success: true,
-      username: response.User?.Username,
-      userSub: response.User?.Attributes?.find((attr) => attr.Name === "sub")
-        ?.Value,
+      username: createdUsername,
+      userSub,
     };
   } catch (error) {
     console.error("Error creating Cognito user:", error);
@@ -93,7 +98,8 @@ export async function createCognitoUser(input: CreateUserInput) {
 }
 
 /**
- * Update user attributes (including custom:role)
+ * Update user attributes (email, name, etc.)
+ * Note: For role changes, use addUserToGroup/removeUserFromGroup instead
  */
 export async function updateCognitoUserAttributes(
   username: string,
@@ -122,13 +128,28 @@ export async function updateCognitoUserAttributes(
 }
 
 /**
- * Update user role
+ * Update user role by managing Cognito group membership
+ * Removes user from old role group and adds to new role group
  */
 export async function updateCognitoUserRole(
   username: string,
-  role: "user" | "admin" | "instructor"
+  newRole: "user" | "admin" | "instructor",
+  oldRole?: "user" | "admin" | "instructor"
 ) {
-  return updateCognitoUserAttributes(username, { "custom:role": role });
+  try {
+    // Remove from old group if specified
+    if (oldRole && oldRole !== newRole) {
+      await removeUserFromGroup(username, oldRole);
+    }
+
+    // Add to new group
+    await addUserToGroup(username, newRole);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating Cognito user role:", error);
+    throw error;
+  }
 }
 
 /**

@@ -58,20 +58,26 @@ model User {
 
 model Certification {
   id          String   @id @default(cuid())
-  name        String   // e.g., "CompTIA Security+ (SY0-701)"
+  name        String   // e.g., "CompTIA Security+"
+  code        String   // e.g., "SY0-701"
   description String?  @db.Text
 
   // Exam Configuration
   blueprint    Json?    // Uploaded exam blueprint structure
-  passingScore Int      @map("passing_score") // e.g., 750 out of 900
+
+  // Scoring Configuration
+  isScoredExam Boolean  @default(true) @map("is_scored_exam") // false = Pass/Fail only
+  passingScore Int?     @map("passing_score") // e.g., 750 (null if Pass/Fail)
+  maxScore     Int?     @map("max_score") // e.g., 900 (null if Pass/Fail)
 
   // Default Settings
   defaultStudyDuration Int @default(45) @map("default_study_duration") // days
 
   // Metadata
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  isActive   Boolean  @default(true) @map("is_active")
+  isArchived Boolean  @default(false) @map("is_archived")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   // Relationships
   domains    CertificationDomain[]
@@ -80,6 +86,8 @@ model Certification {
   currentStudents User[] @relation("CurrentCertification")
 
   @@index([isActive])
+  @@index([isArchived])
+  @@index([code])
   @@map("certifications")
 }
 

@@ -73,18 +73,16 @@ export async function verifyIdToken(token: string) {
  * Extract user information from verified ID token
  *
  * @param token - JWT ID token
- * @returns User information object
+ * @returns User information object with Cognito groups (not custom:role)
  */
 export async function getUserFromIdToken(token: string) {
   const payload = await verifyIdToken(token);
-  const payloadData = payload as Record<string, unknown>;
 
   return {
     sub: payload.sub, // User's unique Cognito ID
     email: payload.email as string,
     emailVerified: payload.email_verified as boolean,
     name: payload.name as string | undefined,
-    role: payloadData["custom:role"] as string | undefined,
     username: payload["cognito:username"] as string,
     groups: (payload["cognito:groups"] as string[]) || [],
   };

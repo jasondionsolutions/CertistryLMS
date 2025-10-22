@@ -19,6 +19,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Tests are located in `tests/` directory
 - Base URL for tests: `http://localhost:3000`
 
+**IMPORTANT - Testing Policy:**
+- **ALWAYS create Playwright tests for every new feature, component, or page created**
+- **ALWAYS create Jest tests for utility functions, hooks, and business logic**
+- Tests should be written as features are developed, not after the fact
+- Test coverage includes:
+  - UI interactions (clicks, form submissions, navigation)
+  - CRUD operations (create, read, update, delete)
+  - Search and filtering functionality
+  - Form validation
+  - Error states and edge cases
+  - Responsive design (mobile, tablet, desktop)
+  - Loading and empty states
+
 ### Database (Prisma)
 - `yarn db:generate` - Generate Prisma Client
 - `yarn db:push` - Push schema changes to database (development)
