@@ -10,12 +10,14 @@ import { NextResponse } from "next/server";
  * proper redirects based on authentication status and roles.
  *
  * Protected routes:
- * - /dashboard/* - Requires authentication
- * - /admin/* - Requires authentication + admin role
+ * - /dashboard/* - Students/users
+ * - /admin/* - Admins and instructors only
  *
  * Public routes:
  * - / (homepage)
  * - /api/auth/* (NextAuth routes)
+ * - /auth/* (Auth error pages)
+ * - /unauthorized (Permission denied page)
  */
 
 export default withAuth(
@@ -23,18 +25,25 @@ export default withAuth(
     const token = req.nextauth.token;
     const path = req.nextUrl.pathname;
 
-    // Admin routes - require admin role
+    // Admin routes - require admin or instructor role
     if (path.startsWith("/admin")) {
       const roles = (token?.roles as string[]) || [];
-      const isAdmin = roles.includes("admin");
+      const isAuthorized = roles.includes("admin") || roles.includes("instructor");
 
-      if (!isAdmin) {
-        // Redirect non-admin users to dashboard
+      if (!isAuthorized) {
+        // Redirect non-admin/instructor users to their dashboard
         return NextResponse.redirect(new URL("/dashboard", req.url));
       }
     }
 
-    // Allow access
+    // Student dashboard routes - all authenticated users can access
+    if (path.startsWith("/dashboard")) {
+      // Already authenticated by the authorized callback
+      // Allow access
+      return NextResponse.next();
+    }
+
+    // Allow access to other routes
     return NextResponse.next();
   },
   {
@@ -44,13 +53,22 @@ export default withAuth(
         const path = req.nextUrl.pathname;
 
         // Public routes - no auth required
-        if (path === "/" || path.startsWith("/api/auth")) {
+        if (
+          path === "/" ||
+          path.startsWith("/api/auth") ||
+          path.startsWith("/auth/") ||
+          path === "/unauthorized"
+        ) {
           return true;
         }
 
-        // Protected routes - require auth
+        // Protected routes - require authentication
         if (path.startsWith("/dashboard") || path.startsWith("/admin")) {
-          return !!token; // Only allow if user has a valid token
+          if (!token) {
+            // Redirect to unauthorized page instead of sign-in
+            return false;
+          }
+          return true;
         }
 
         // Default: allow access
@@ -58,7 +76,7 @@ export default withAuth(
       },
     },
     pages: {
-      signIn: "/", // Redirect to homepage for sign-in
+      signIn: "/unauthorized", // Redirect to unauthorized page if not authenticated
     },
   }
 );

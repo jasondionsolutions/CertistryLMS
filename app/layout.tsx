@@ -4,7 +4,6 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { SessionProvider } from "@/components/session-provider";
-import { ModeToggle } from "@/components/darkmode-toggle";
 import { Toaster } from "sonner";
 
 const geistSans = Geist({
@@ -19,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "CertistryLMS",
-  description: "Next-generation Learning Management System",
+  description: "Next-generation Learning Management System for certification exam preparation",
 };
 
 export default async function RootLayout({
@@ -28,7 +27,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SessionProvider>
           <ThemeProvider
@@ -41,9 +40,6 @@ export default async function RootLayout({
             <QueryProvider>
               {children}
               <Toaster richColors position="top-right" />
-              <div className="absolute end-0 top-0 pe-4 pt-4">
-                <ModeToggle />
-              </div>
             </QueryProvider>
           </ThemeProvider>
         </SessionProvider>
