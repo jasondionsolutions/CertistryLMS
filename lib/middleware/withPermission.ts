@@ -37,7 +37,7 @@ function checkPermissions(
  * ```
  */
 export function withPermission(required: Permission | Permission[]) {
-  return <Args extends any[], R>(
+  return <Args extends unknown[], R>(
     actionFn: (user: AuthContext, ...args: Args) => Promise<R>
   ) => {
     return async (...args: Args): Promise<R> => {

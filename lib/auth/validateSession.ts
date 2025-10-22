@@ -1,5 +1,5 @@
 // lib/auth/validateSession.ts
-import { AuthContext, UnauthorizedError } from "./types";
+import { AuthContext } from "./types";
 
 /**
  * Validates the current session and returns the auth context.

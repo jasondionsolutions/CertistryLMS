@@ -22,7 +22,7 @@ import { AuthContext, UnauthorizedError } from "@/lib/auth/types";
  * });
  * ```
  */
-export function withAccess<Args extends any[], R>(
+export function withAccess<Args extends unknown[], R>(
   actionFn: (user: AuthContext, ...args: Args) => Promise<R>
 ) {
   return async (...args: Args): Promise<R> => {
