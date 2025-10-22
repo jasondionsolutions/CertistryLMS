@@ -1,21 +1,22 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Database: PostgreSQL on Neon.tech serverless
+// Neon provides instant branching, autoscaling, and scale-to-zero for Postgres
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "mongodb"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // Direct connection for migrations (bypasses connection pooler)
 }
 
 // Example model - User with visitor tracking
 model User {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String   @id @default(cuid())
   email     String   @unique
   name      String?
   roles     String[] @default([])

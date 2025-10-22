@@ -24,13 +24,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `yarn db:push` - Push schema changes to database (development)
 - `yarn db:studio` - Open Prisma Studio GUI
 - Schema location: `schema/schema.prisma`
-- Database: MongoDB Atlas (connection string in `.env`)
+- Database: PostgreSQL on Neon.tech serverless (connection string in `.env`)
 
 ### Deployment
 - **Platform**: Vercel (automatic deployments on main branch push)
 - **Environment Variables**: Managed in Vercel project settings
-- **Database**: MongoDB Atlas connection via `DATABASE_URL` env var
-- **Preview Deployments**: Automatic for all pull requests
+- **Database**: PostgreSQL on Neon.tech serverless via `DATABASE_URL` env var
+- **Preview Deployments**: Automatic for all pull requests (with Neon branch databases)
 - **Production URL**: [To be configured]
 
 ## Architecture
@@ -42,7 +42,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Theming**: next-themes for dark mode support
 - **Fonts**: Geist Sans and Geist Mono via next/font/google
 - **Authentication**: AWS Cognito with RBAC
-- **Database**: Prisma ORM + MongoDB Atlas
+- **Database**: Prisma ORM + PostgreSQL (Neon.tech serverless)
 - **State Management**: Zustand (optional - only for complex client UI state, not server data)
 - **Validation**: Zod schemas
 - **Testing**: Playwright for e2e
