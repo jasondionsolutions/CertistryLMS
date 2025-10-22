@@ -14,14 +14,439 @@ datasource db {
   directUrl = env("DIRECT_URL") // Direct connection for migrations (bypasses connection pooler)
 }
 
-// Example model - User with visitor tracking
+// =============================================================================
+// USER & AUTHENTICATION
+// =============================================================================
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
-  roles     String[] @default([])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  roles     String[] @default(["user"])
 
+  // AWS Cognito Integration Fields
+  cognitoId String?  @unique @map("cognito_id")
+  cognitoUsername String? @map("cognito_username")
+
+  // Current Learning Context
+  currentCertificationId String? @map("current_certification_id")
+  currentCertification   Certification? @relation("CurrentCertification", fields: [currentCertificationId], references: [id], onDelete: SetNull)
+
+  studyPlanDuration Int? @map("study_plan_duration") // 30, 45, or 60 days
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  diagnostics       StudentDiagnostic[]
+  learningPaths     StudentLearningPath[]
+  progress          StudentProgress[]
+  quizAttempts      StudentQuizAttempt[]
+  flashcards        Flashcard[]
+  practiceExams     PracticeExam[]
+  videoCompletions  VideoCompletion[]
+  pbqAttempts       PBQAttempt[]
+
+  @@index([email])
+  @@index([cognitoId])
   @@map("users")
 }
+
+// =============================================================================
+// CERTIFICATION STRUCTURE
+// =============================================================================
+
+model Certification {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "CompTIA Security+ (SY0-701)"
+  description String?  @db.Text
+
+  // Exam Configuration
+  blueprint    Json?    // Uploaded exam blueprint structure
+  passingScore Int      @map("passing_score") // e.g., 750 out of 900
+
+  // Default Settings
+  defaultStudyDuration Int @default(45) @map("default_study_duration") // days
+
+  // Metadata
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  domains    CertificationDomain[]
+  diagnostics StudentDiagnostic[]
+  learningPaths StudentLearningPath[]
+  currentStudents User[] @relation("CurrentCertification")
+
+  @@index([isActive])
+  @@map("certifications")
+}
+
+model CertificationDomain {
+  id              String   @id @default(cuid())
+  certificationId String   @map("certification_id")
+  certification   Certification @relation(fields: [certificationId], references: [id], onDelete: Cascade)
+
+  name   String // e.g., "Threats, Attacks, and Vulnerabilities"
+  weight Float  // Percentage weight on exam (e.g., 0.24 for 24%)
+  order  Int    // Display order
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  objectives CertificationObjective[]
+
+  @@unique([certificationId, order])
+  @@index([certificationId])
+  @@map("certification_domains")
+}
+
+model CertificationObjective {
+  id       String @id @default(cuid())
+  domainId String @map("domain_id")
+  domain   CertificationDomain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  code        String // e.g., "1.1", "2.3"
+  description String @db.Text // Full objective text
+  difficulty  String @default("intermediate") // "beginner", "intermediate", "advanced"
+  order       Int    // Order within domain
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  videoMappings VideoObjectiveMapping[]
+  documents     Document[]
+  questions     Question[]
+  pbqs          PBQ[]
+  progress      StudentProgress[]
+
+  @@unique([domainId, code])
+  @@index([domainId])
+  @@index([difficulty])
+  @@map("certification_objectives")
+}
+
+// =============================================================================
+// CONTENT (Videos, Documents)
+// =============================================================================
+
+model Video {
+  id          String @id @default(cuid())
+  title       String
+  url         String // S3/CloudFront URL or external URL
+  transcript  String? @db.Text
+
+  // Metadata
+  duration        Int? // Duration in seconds
+  difficultyLevel String @default("intermediate") @map("difficulty_level")
+
+  // Content Status
+  isProcessed Boolean @default(false) @map("is_processed") // Transcription complete
+  isActive    Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  objectiveMappings VideoObjectiveMapping[]
+  completions       VideoCompletion[]
+
+  @@index([isActive])
+  @@index([difficultyLevel])
+  @@map("videos")
+}
+
+model VideoObjectiveMapping {
+  id          String @id @default(cuid())
+  videoId     String @map("video_id")
+  video       Video  @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  objectiveId String @map("objective_id")
+  objective   CertificationObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+
+  // Mapping Metadata
+  isPrimary Boolean @default(false) @map("is_primary") // Is this the main objective for this video?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([videoId, objectiveId])
+  @@index([videoId])
+  @@index([objectiveId])
+  @@map("video_objective_mappings")
+}
+
+model Document {
+  id          String @id @default(cuid())
+  title       String
+  url         String // S3 URL for PDF/document
+  type        String // "pdf", "markdown", "link"
+
+  objectiveId String @map("objective_id")
+  objective   CertificationObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([objectiveId])
+  @@index([isActive])
+  @@map("documents")
+}
+
+// =============================================================================
+// QUESTIONS & ASSESSMENTS
+// =============================================================================
+
+model Question {
+  id          String @id @default(cuid())
+  type        String // "multiple_choice", "multiple_select", "scenario"
+  difficulty  String // "easy", "medium", "hard"
+
+  // Question Content
+  text        String @db.Text
+  choices     Json   // Array of choice objects
+  correctAnswer String @map("correct_answer") // JSON array for multiple_select
+  explanation String @db.Text
+
+  // Categorization
+  objectiveId String @map("objective_id")
+  objective   CertificationObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+
+  // Question Type Tag (from Chapter 5)
+  questionType String? @map("question_type") // "scenario", "recall", "best_practice", "exception", "calculation", "sequence", "application"
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  quizAttempts StudentQuizAttempt[]
+
+  @@index([objectiveId])
+  @@index([difficulty])
+  @@index([questionType])
+  @@index([isActive])
+  @@map("questions")
+}
+
+model PBQ {
+  id          String @id @default(cuid())
+  type        String // "firewall", "logs", "drag_drop", "image_labeling"
+  title       String
+
+  objectiveId String @map("objective_id")
+  objective   CertificationObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+
+  config        Json // Configuration for the PBQ (varies by type)
+  scoringRubric Json @map("scoring_rubric") // How to score the attempt
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  attempts PBQAttempt[]
+
+  @@index([objectiveId])
+  @@index([type])
+  @@index([isActive])
+  @@map("pbqs")
+}
+
+// =============================================================================
+// STUDENT PROGRESS & LEARNING PATH
+// =============================================================================
+
+model StudentDiagnostic {
+  id              String @id @default(cuid())
+  studentId       String @map("student_id")
+  student         User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  certificationId String @map("certification_id")
+  certification   Certification @relation(fields: [certificationId], references: [id], onDelete: Cascade)
+
+  // Scores
+  overallScore  Float         @map("overall_score") // Overall percentage
+  domainScores  Json          @map("domain_scores") // Object with domain-level scores
+
+  // Results
+  completedAt DateTime       @map("completed_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  @@index([studentId])
+  @@index([certificationId])
+  @@index([completedAt])
+  @@map("student_diagnostics")
+}
+
+model StudentLearningPath {
+  id          String @id @default(cuid())
+  studentId   String @map("student_id")
+  student     User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  certificationId String @map("certification_id")
+  certification   Certification @relation(fields: [certificationId], references: [id], onDelete: Cascade)
+
+  // Learning Path Configuration
+  skippedObjectives   String[] @map("skipped_objectives") // ObjectiveIds student can skip
+  priorityObjectives  String[] @map("priority_objectives") // ObjectiveIds requiring focus
+
+  estimatedCompletionDate DateTime? @map("estimated_completion_date")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([studentId, certificationId])
+  @@index([studentId])
+  @@index([certificationId])
+  @@map("student_learning_paths")
+}
+
+model StudentProgress {
+  id          String @id @default(cuid())
+  studentId   String @map("student_id")
+  student     User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  objectiveId String @map("objective_id")
+  objective   CertificationObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+
+  // Progress Status
+  status         String   @default("not_started") // "not_started", "in_progress", "completed", "mastered"
+
+  // Performance Metrics
+  quizScores     Json?    @map("quiz_scores") // Array of quiz attempt scores
+  videoCompletionIds String[] @map("video_completion_ids") // Video IDs completed for this objective
+
+  lastAccessed DateTime? @map("last_accessed")
+  completedAt  DateTime? @map("completed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([studentId, objectiveId])
+  @@index([studentId])
+  @@index([objectiveId])
+  @@index([status])
+  @@map("student_progress")
+}
+
+model VideoCompletion {
+  id        String @id @default(cuid())
+  studentId String @map("student_id")
+  student   User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  videoId   String @map("video_id")
+  video     Video  @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  // Completion Tracking
+  watchedSeconds Int       @map("watched_seconds") // How much was watched
+  completed      Boolean   @default(false) // Watched >90% of video
+
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([studentId, videoId])
+  @@index([studentId])
+  @@index([videoId])
+  @@map("video_completions")
+}
+
+model StudentQuizAttempt {
+  id         String @id @default(cuid())
+  studentId  String @map("student_id")
+  student    User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  questionId String @map("question_id")
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  // Attempt Data
+  score      Float // 0.0 to 1.0
+  answers    Json  // User's answers
+  errorTypes Json? @map("error_types") // "knowledge_gap", "misreading", "logic_error"
+
+  attemptedAt DateTime @default(now()) @map("attempted_at")
+
+  @@index([studentId])
+  @@index([questionId])
+  @@index([attemptedAt])
+  @@map("student_quiz_attempts")
+}
+
+model PBQAttempt {
+  id        String @id @default(cuid())
+  studentId String @map("student_id")
+  student   User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  pbqId     String @map("pbq_id")
+  pbq       PBQ    @relation(fields: [pbqId], references: [id], onDelete: Cascade)
+
+  // Attempt Data
+  score    Float // 0.0 to 1.0
+  response Json  // User's configuration/answer
+
+  completedAt DateTime @default(now()) @map("completed_at")
+
+  @@index([studentId])
+  @@index([pbqId])
+  @@map("pbq_attempts")
+}
+
+// =============================================================================
+// SPACED REPETITION & PRACTICE
+// =============================================================================
+
+model Flashcard {
+  id          String @id @default(cuid())
+  studentId   String @map("student_id")
+  student     User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  objectiveId String @map("objective_id")
+
+  // Flashcard Content
+  front String @db.Text
+  back  String @db.Text
+
+  // Spaced Repetition (1-3-7-14-21 day cycle)
+  nextReviewDate   DateTime @map("next_review_date")
+  difficultyRating Int      @default(3) @map("difficulty_rating") // 1-5 scale
+  reviewCount      Int      @default(0) @map("review_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([studentId])
+  @@index([nextReviewDate])
+  @@map("flashcards")
+}
+
+model PracticeExam {
+  id        String @id @default(cuid())
+  studentId String @map("student_id")
+  student   User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  // Exam Results
+  score            Float   // Overall score
+  domainBreakdown  Json    @map("domain_breakdown") // Score by domain
+  readinessScore   Float?  @map("readiness_score") // Predicted pass probability
+
+  // Exam Metadata
+  examType   String @default("weekly") @map("exam_type") // "diagnostic", "weekly", "final"
+
+  completedAt DateTime @default(now()) @map("completed_at")
+
+  @@index([studentId])
+  @@index([completedAt])
+  @@index([examType])
+  @@map("practice_exams")
+}
+
+// =============================================================================
+// RELATIONSHIPS NOTE
+// =============================================================================
+// All models include proper cascading deletes:
+// - Deleting a Certification cascades to Domains, which cascade to Objectives
+// - Deleting a User cascades to all their progress, attempts, and flashcards
+// - Deleting content (Videos, Questions) cascades to related mappings and attempts
