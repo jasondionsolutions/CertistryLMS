@@ -41,22 +41,13 @@ export const authOptions: NextAuthOptions = {
           // Extract roles from Cognito groups
           const profileData = profile as Record<string, unknown>;
 
-          // DEBUG: Log the full profile to see what Cognito is sending
-          console.log("🔍 [DEBUG] Cognito profile:", JSON.stringify(profileData, null, 2));
-
           // Cognito groups are in "cognito:groups" claim
           const cognitoGroups = (profileData["cognito:groups"] as string[]) || [];
-
-          // DEBUG: Log extracted groups
-          console.log("🔍 [DEBUG] Cognito groups extracted:", cognitoGroups);
 
           // Map Cognito groups to roles (groups like "admin", "user", "instructor")
           // If user is in multiple groups, keep all of them
           // Default to "user" role if no groups assigned
           const roles = cognitoGroups.length > 0 ? cognitoGroups : ["user"];
-
-          // DEBUG: Log final roles
-          console.log("🔍 [DEBUG] Final roles assigned:", roles);
 
           // Sync user with database - handle both new and existing users
           // First, try to find user by cognitoId OR email

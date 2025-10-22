@@ -13,7 +13,7 @@ export default async function AdminPage() {
   let authContext;
   try {
     authContext = await validateSession();
-  } catch (error) {
+  } catch {
     // Redirect to home if not authenticated
     redirect("/");
   }

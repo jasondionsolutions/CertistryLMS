@@ -233,6 +233,60 @@ function BookList() {
 5. Build UI components that consume hooks
 6. Write Playwright tests
 
+### ESLint Rules & Code Quality
+
+**Critical Rules to Follow:**
+
+1. **No Unused Variables** - Remove unused error catches:
+```typescript
+// ❌ WRONG
+try {
+  await validateSession();
+} catch (error) {  // error is unused
+  redirect("/");
+}
+
+// ✅ CORRECT
+try {
+  await validateSession();
+} catch {  // No parameter if not used
+  redirect("/");
+}
+```
+
+2. **No Unescaped Entities** - Escape apostrophes in JSX:
+```typescript
+// ❌ WRONG
+<p>You don't have permission</p>
+
+// ✅ CORRECT
+<p>You don&apos;t have permission</p>
+```
+
+3. **Console Statements** - Only use `console.warn()` and `console.error()`:
+```typescript
+// ❌ WRONG
+console.log("Debug info");
+
+// ✅ CORRECT
+console.error("Error info");
+console.warn("Warning info");
+```
+
+4. **Remove Debug Logs Before Committing** - Clean up debug code:
+```typescript
+// ❌ WRONG - Don't commit debug logs
+console.log("🔍 [DEBUG] User data:", user);
+
+// ✅ CORRECT - Remove before committing
+// Debug code removed
+```
+
+**ESLint Build Errors:**
+- All ESLint errors MUST be fixed before committing
+- Run `yarn build` to check for ESLint issues
+- Run `yarn lint` to see all linting issues
+
 ### Error Handling
 
 ```typescript

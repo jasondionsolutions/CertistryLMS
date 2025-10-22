@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   let authContext;
   try {
     authContext = await validateSession();
-  } catch (error) {
+  } catch {
     // Redirect to home if not authenticated
     redirect("/");
   }
