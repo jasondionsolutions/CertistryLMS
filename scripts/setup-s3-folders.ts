@@ -10,7 +10,7 @@
  * Run with: npx tsx scripts/setup-s3-folders.ts
  */
 
-import { S3Client, PutObjectCommand, ListBucketsCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
 import * as dotenv from "dotenv";
 
 // Load environment variables
@@ -46,27 +46,18 @@ const ENVIRONMENTS = ["dev", "staging", "prod"];
 const CATEGORIES = ["videos", "pdfs", "images", "thumbnails"];
 
 /**
- * Test S3 connection by listing buckets
+ * Test S3 connection by checking bucket access
+ * (Doesn't require s3:ListAllMyBuckets permission)
  */
 async function testConnection(): Promise<boolean> {
   try {
-    console.log("🔍 Testing S3 connection...");
-    const command = new ListBucketsCommand({});
-    const response = await s3Client.send(command);
+    console.log("🔍 Testing S3 connection and bucket access...");
+    const command = new HeadBucketCommand({ Bucket: BUCKET_NAME });
+    await s3Client.send(command);
 
-    const bucketExists = response.Buckets?.some(b => b.Name === BUCKET_NAME);
-
-    if (bucketExists) {
-      console.log(`✅ Successfully connected to AWS S3`);
-      console.log(`✅ Bucket '${BUCKET_NAME}' found\n`);
-      return true;
-    } else {
-      console.error(`❌ Bucket '${BUCKET_NAME}' not found`);
-      console.error("\nAvailable buckets:");
-      response.Buckets?.forEach(b => console.error(`  - ${b.Name}`));
-      console.error("\nPlease create the bucket or update AWS_S3_BUCKET_NAME in .env\n");
-      return false;
-    }
+    console.log(`✅ Successfully connected to AWS S3`);
+    console.log(`✅ Bucket '${BUCKET_NAME}' found and accessible\n`);
+    return true;
   } catch (error) {
     console.error("❌ Failed to connect to S3");
 
@@ -77,31 +68,12 @@ async function testConnection(): Promise<boolean> {
       } else if (error.name === "SignatureDoesNotMatch") {
         console.error("\n🔒 Invalid Secret Access Key");
         console.error("Please check AWS_S3_SECRET_ACCESS_KEY in your .env file\n");
-      } else {
-        console.error(`\nError: ${error.message}\n`);
-      }
-    }
-
-    return false;
-  }
-}
-
-/**
- * Check bucket accessibility
- */
-async function checkBucketAccess(): Promise<boolean> {
-  try {
-    console.log("🔍 Checking bucket permissions...");
-    const command = new HeadBucketCommand({ Bucket: BUCKET_NAME });
-    await s3Client.send(command);
-    console.log(`✅ You have access to bucket '${BUCKET_NAME}'\n`);
-    return true;
-  } catch (error) {
-    console.error(`❌ Cannot access bucket '${BUCKET_NAME}'`);
-
-    if (error instanceof Error) {
-      if (error.name === "Forbidden" || error.name === "AccessDenied") {
-        console.error("\n🔒 Access Denied");
+      } else if (error.name === "NotFound" || error.name === "NoSuchBucket") {
+        console.error(`\n📦 Bucket '${BUCKET_NAME}' not found`);
+        console.error("Please create the bucket in AWS S3 Console");
+        console.error("or update AWS_S3_BUCKET_NAME in your .env file\n");
+      } else if (error.name === "Forbidden" || error.name === "AccessDenied") {
+        console.error(`\n🔒 Access denied to bucket '${BUCKET_NAME}'`);
         console.error("Your IAM user doesn't have permission to access this bucket.");
         console.error("Please verify the IAM policy is attached correctly.\n");
       } else {
@@ -112,6 +84,7 @@ async function checkBucketAccess(): Promise<boolean> {
     return false;
   }
 }
+
 
 /**
  * Create folder structure with placeholder files
@@ -194,22 +167,16 @@ async function main() {
   console.log("\n🚀 CertistryLMS S3 Setup Script\n");
   console.log("=".repeat(50) + "\n");
 
-  // Step 1: Test connection
+  // Step 1: Test connection and bucket access
   const connected = await testConnection();
   if (!connected) {
     process.exit(1);
   }
 
-  // Step 2: Check bucket access
-  const hasAccess = await checkBucketAccess();
-  if (!hasAccess) {
-    process.exit(1);
-  }
-
-  // Step 3: Create folder structure
+  // Step 2: Create folder structure
   await createFolderStructure();
 
-  // Step 4: Display structure
+  // Step 3: Display structure
   displayFolderStructure();
 
   // Success message
