@@ -17,6 +17,7 @@
     "db:generate": "prisma generate --schema=./schema/schema.prisma",
     "db:push": "prisma db push --schema=./schema/schema.prisma",
     "db:studio": "prisma studio --schema=./schema/schema.prisma",
+    "db:seed": "node scripts/seed-ai-models.js",
     "s3:setup": "tsx scripts/setup-s3-folders.ts"
   },
   "dependencies": {
