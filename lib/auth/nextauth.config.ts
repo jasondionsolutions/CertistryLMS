@@ -114,6 +114,7 @@ export const authOptions: NextAuthOptions = {
 
     /**
      * Redirect callback - controls where users are redirected after sign-in
+     * Homepage will handle role-based redirect to /admin or /dashboard
      */
     async redirect({ url, baseUrl }) {
       // Allows relative callback URLs
@@ -122,8 +123,8 @@ export const authOptions: NextAuthOptions = {
       // Allows callback URLs on the same origin
       if (new URL(url).origin === baseUrl) return url;
 
-      // Default redirect to dashboard
-      return `${baseUrl}/dashboard`;
+      // Redirect to homepage, which will redirect based on role
+      return baseUrl;
     },
   },
 
