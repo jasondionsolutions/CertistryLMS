@@ -26,6 +26,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Schema location: `schema/schema.prisma`
 - Database: MongoDB Atlas (connection string in `.env`)
 
+### Deployment
+- **Platform**: Vercel (automatic deployments on main branch push)
+- **Environment Variables**: Managed in Vercel project settings
+- **Database**: MongoDB Atlas connection via `DATABASE_URL` env var
+- **Preview Deployments**: Automatic for all pull requests
+- **Production URL**: [To be configured]
+
 ## Architecture
 
 ### Stack
@@ -36,6 +43,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Fonts**: Geist Sans and Geist Mono via next/font/google
 - **Authentication**: AWS Cognito with RBAC
 - **Database**: Prisma ORM + MongoDB Atlas
+- **State Management**: Zustand (optional - only for complex client UI state, not server data)
 - **Validation**: Zod schemas
 - **Testing**: Playwright for e2e
 
@@ -84,6 +92,28 @@ export const deleteBook = withPermission('books.delete')(async (
 });
 ```
 
+**Server Action Naming Convention**:
+- Location: `/modules/[feature]/serverActions/[feature].action.ts`
+- File: `book.action.ts`, `exam.action.ts`, `user.action.ts`
+- Exports: `createBook`, `updateBook`, `deleteBook`, `getBook`, `listBooks`
+- Always include `"use server"` directive at top of file
+- Return type: `Promise<{ success: boolean; data?: T; error?: string }>`
+
+**AuthContext Type**: All server actions receive authenticated user context as first parameter.
+
+```typescript
+// lib/auth/types.ts
+export interface AuthContext {
+  userId: string;      // Unique user identifier
+  email: string;       // User email
+  name?: string;       // Optional display name
+  roles: string[];     // User roles (e.g., ['user', 'admin'])
+  permissions: string[]; // Granular permissions (e.g., ['books.delete'])
+}
+```
+
+All server actions automatically receive this context as the first parameter when wrapped with `withAccess()` or `withPermission()`.
+
 **Client Hooks Pattern**: All components access server actions through typed hooks.
 
 ```typescript
@@ -121,10 +151,46 @@ await prisma.book.findMany({
 
 **Theme System**: Dark mode via ThemeProvider wrapping the app layout. All semantic color tokens automatically support dark mode.
 
+**Session Management**: Server-side, cookie-based sessions only.
+
+```typescript
+// ✅ CORRECT: Server-side session storage
+const session = await getServerSession();
+
+// ✅ CORRECT: httpOnly cookies
+cookies().set('session', token, { httpOnly: true, secure: true });
+
+// ❌ WRONG: Never use localStorage for auth
+localStorage.setItem('token', jwt); // FORBIDDEN
+
+// ❌ WRONG: Never expose tokens to client
+const token = session.accessToken; // FORBIDDEN in client components
+```
+
+**UI Standards**:
+- **Layout**: Max width 1920px, centered with fluid scaling
+- **Breakpoints**: Tailwind responsive (sm: 640px, md: 768px, lg: 1024px, xl: 1280px)
+- **Mobile**: Min 44px touch targets, progressive disclosure (use `md:hidden` for complex UI)
+- **Loading States**: Skeletons for data fetching, spinners for actions, optimistic updates
+- **Feedback**: Toast notifications via Sonner (success, error, warning)
+- **Accessibility**: Semantic HTML, ARIA labels, keyboard navigation support
+
+```typescript
+// Component loading state example
+function BookList() {
+  const { data: books, isLoading } = useBooks();
+
+  if (isLoading) return <BookListSkeleton />;
+
+  return <div>{books.map(book => <BookCard key={book.id} book={book} />)}</div>;
+}
+```
+
 ### Directory Structure
 
 **Modular Structure** (current implementation):
 - `app/` - Next.js App Router pages and layouts
+- `config/` - Environment configuration and constants
 - `modules/[feature]/` - Feature-isolated domains
   - `modules/[feature]/ui/` - Feature components (client components)
   - `modules/[feature]/hooks/` - Client hooks (TanStack Query)
