@@ -1,32 +1,108 @@
 // lib/auth/validateSession.ts
-import { AuthContext } from "./types";
+import { getServerSession } from "next-auth";
+import { authOptions } from "./nextauth.config";
+import { AuthContext, UnauthorizedError } from "./types";
+import { prisma } from "@/lib/prisma";
+
+/**
+ * Permission mapping based on user roles
+ *
+ * This defines what permissions each role has access to.
+ * Customize this based on your application's needs.
+ */
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  admin: [
+    "read",
+    "write",
+    "delete",
+    "users.manage",
+    "certifications.manage",
+    "content.manage",
+    "analytics.view",
+  ],
+  instructor: [
+    "read",
+    "write",
+    "content.create",
+    "content.edit",
+    "students.view",
+    "analytics.view",
+  ],
+  user: ["read", "content.view", "progress.manage"],
+};
 
 /**
  * Validates the current session and returns the auth context.
- * This is a placeholder implementation until AWS Cognito is integrated.
  *
- * In production, this will:
- * 1. Get session from getServerSession() or AWS Cognito
- * 2. Validate JWT token
- * 3. Enrich user context with roles and permissions from database
+ * This function:
+ * 1. Gets session from NextAuth (validates JWT)
+ * 2. Verifies user exists in database
+ * 3. Enriches context with roles and permissions
+ * 4. Returns AuthContext for use in server actions
  *
  * @returns {Promise<AuthContext>} The authenticated user context
  * @throws {UnauthorizedError} If authentication fails
  */
 export async function validateSession(): Promise<AuthContext> {
-  // TODO: Implement real session validation with AWS Cognito
-  // const session = await getServerSession();
-  // if (!session?.user) throw new UnauthorizedError("Authentication required");
+  // Get session from NextAuth
+  const session = await getServerSession(authOptions);
 
-  // Placeholder: Return mock auth context for development
-  // Remove this when implementing real authentication
-  const mockAuthContext: AuthContext = {
-    userId: "dev-user-id",
-    email: "dev@example.com",
-    name: "Dev User",
-    roles: ["user"],
-    permissions: ["read", "write"],
+  if (!session?.user) {
+    throw new UnauthorizedError("Authentication required");
+  }
+
+  // Get user ID from session
+  const sessionUser = session.user as Record<string, unknown>;
+  const userId = sessionUser.id as string;
+  if (!userId) {
+    throw new UnauthorizedError("Invalid session - missing user ID");
+  }
+
+  // Fetch user from database to get latest roles
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      roles: true,
+    },
+  });
+
+  if (!user) {
+    throw new UnauthorizedError("User not found");
+  }
+
+  // Map roles to permissions
+  const permissions = new Set<string>();
+  user.roles.forEach((role) => {
+    const rolePermissions = ROLE_PERMISSIONS[role] || [];
+    rolePermissions.forEach((perm) => permissions.add(perm));
+  });
+
+  // Build and return AuthContext
+  const authContext: AuthContext = {
+    userId: user.id,
+    email: user.email,
+    name: user.name || undefined,
+    roles: user.roles,
+    permissions: Array.from(permissions),
   };
 
-  return mockAuthContext;
+  return authContext;
+}
+
+/**
+ * Get current session without throwing error
+ *
+ * Useful for optional authentication (e.g., public pages that show different content for logged-in users)
+ *
+ * @returns {Promise<AuthContext | null>} Auth context or null if not authenticated
+ */
+export async function getOptionalSession(): Promise<AuthContext | null> {
+  try {
+    return await validateSession();
+  } catch {
+    return null;
+  }
 }
