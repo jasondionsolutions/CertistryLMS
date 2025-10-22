@@ -125,6 +125,7 @@ model CertificationObjective {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relationships
+  bullets       Bullet[]
   videoMappings VideoObjectiveMapping[]
   documents     Document[]
   questions     Question[]
@@ -135,6 +136,41 @@ model CertificationObjective {
   @@index([domainId])
   @@index([difficulty])
   @@map("certification_objectives")
+}
+
+model Bullet {
+  id          String @id @default(cuid())
+  objectiveId String @map("objective_id")
+  objective   CertificationObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+
+  text  String @db.Text
+  order Int    // Display order within objective
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  subBullets SubBullet[]
+
+  @@unique([objectiveId, order])
+  @@index([objectiveId])
+  @@map("bullets")
+}
+
+model SubBullet {
+  id       String @id @default(cuid())
+  bulletId String @map("bullet_id")
+  bullet   Bullet @relation(fields: [bulletId], references: [id], onDelete: Cascade)
+
+  text  String @db.Text
+  order Int    // Display order within bullet
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([bulletId, order])
+  @@index([bulletId])
+  @@map("sub_bullets")
 }
 
 // =============================================================================
@@ -480,6 +516,26 @@ model File {
   @@index([referenceType])
   @@index([category])
   @@map("files")
+}
+
+// =============================================================================
+// AI MODELS
+// =============================================================================
+
+model AIModel {
+  id          String   @id @default(cuid())
+  name        String   // Display name e.g., "Claude 3.5 Sonnet"
+  modelId     String   @unique @map("model_id") // API model ID e.g., "claude-3-5-sonnet-20241022"
+  provider    String   // "anthropic", "openai", etc.
+  description String?  @db.Text
+
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([provider])
+  @@index([isActive])
+  @@map("ai_models")
 }
 
 // =============================================================================

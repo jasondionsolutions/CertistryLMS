@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Search, MoreVertical, LayoutGrid, List, Edit, Trash } from "lucide-react";
+import { Plus, Search, MoreVertical, LayoutGrid, List, Edit, Trash, FileText } from "lucide-react";
 import { useCertifications } from "@/modules/certifications/hooks/useCertifications";
 import { CertificationForm } from "@/modules/certifications/ui/CertificationForm";
 import { DeleteCertificationDialog } from "@/modules/certifications/ui/DeleteCertificationDialog";
@@ -33,6 +34,7 @@ type Certification = {
 };
 
 export default function CertificationsPage() {
+  const router = useRouter();
   const [viewMode, setViewMode] = React.useState<"card" | "table">("card");
   const [search, setSearch] = React.useState("");
   const [status, setStatus] = React.useState<"all" | "active" | "inactive" | "archived">("all");
@@ -168,6 +170,10 @@ export default function CertificationsPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => router.push(`/admin/certifications/${cert.id}/blueprint`)}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Manage Blueprint
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleEdit(cert)}>
                       <Edit className="h-4 w-4 mr-2" />
                       Edit
@@ -275,6 +281,10 @@ export default function CertificationsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => router.push(`/admin/certifications/${cert.id}/blueprint`)}>
+                            <FileText className="h-4 w-4 mr-2" />
+                            Manage Blueprint
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEdit(cert)}>
                             <Edit className="h-4 w-4 mr-2" />
                             Edit

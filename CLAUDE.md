@@ -20,14 +20,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Base URL for tests: `http://localhost:3000`
 
 **IMPORTANT - Testing Policy:**
+- **BOTH Playwright (E2E) AND Jest (component) tests MUST be completed for all new features**
 - **ALWAYS create Playwright tests for every new feature, component, or page created**
 - **ALWAYS create Jest tests for utility functions, hooks, and business logic**
+- **A feature is NOT considered complete until both E2E and component tests are written and passing**
 - Tests should be written as features are developed, not after the fact
 - Test coverage includes:
-  - UI interactions (clicks, form submissions, navigation)
-  - CRUD operations (create, read, update, delete)
-  - Search and filtering functionality
-  - Form validation
+  - **Playwright (E2E)**: UI interactions, CRUD operations, navigation, form submissions, search/filtering
+  - **Jest (Component/Unit)**: Utility functions, custom hooks, business logic, data transformations
+  - Form validation (both E2E and unit)
   - Error states and edge cases
   - Responsive design (mobile, tablet, desktop)
   - Loading and empty states

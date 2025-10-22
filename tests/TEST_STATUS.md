@@ -1,6 +1,6 @@
 # Test Status Summary
 
-## Current Status: ✅ Working (12/34 tests passing)
+## Current Status: ✅ Working (12 passing, 72+ pending authentication)
 
 ### Passing Tests (12)
 All **homepage tests** are passing:
@@ -16,8 +16,8 @@ All **homepage tests** are passing:
 - ✅ Tablet responsive (768x1024)
 - ✅ Visual regression screenshots
 
-### Skipped Tests (22)
-**Certification management tests** are skipped pending authentication setup:
+### Skipped Tests (Pending Authentication Setup)
+**Certification management tests** (`tests/certifications.spec.ts`) - 22 tests:
 - ⏭️ Page load and UI tests
 - ⏭️ Search and filtering tests
 - ⏭️ Create certification tests
@@ -25,6 +25,22 @@ All **homepage tests** are passing:
 - ⏭️ Delete certification tests
 - ⏭️ Empty state tests
 - ⏭️ Results display tests
+
+**AI Models management tests** (`tests/ai-models.spec.ts`) - 20+ tests:
+- ⏭️ Page load and UI tests
+- ⏭️ Search functionality tests
+- ⏭️ Create AI model tests
+- ⏭️ Edit AI model tests
+- ⏭️ Delete AI model tests
+- ⏭️ Status display tests
+
+**Blueprint management tests** (`tests/blueprint.spec.ts`) - 30+ tests:
+- ⏭️ Navigation to blueprint page
+- ⏭️ Upload PDF tab tests
+- ⏭️ Manual/Edit tab tests
+- ⏭️ DomainsEditor functionality tests
+- ⏭️ Save and reset functionality tests
+- ⏭️ Manage Blueprint menu item tests
 
 ## Running Tests
 
@@ -69,13 +85,15 @@ A test bypass endpoint exists at `/api/test-auth/signin` that only works in deve
 
 ### ⏳ Pending Authentication Setup
 - [ ] Certification CRUD operations
+- [ ] AI Models CRUD operations
+- [ ] Blueprint management operations
 - [ ] Admin dashboard access
 - [ ] Role-based permission testing
 
 ### 📋 Not Yet Created
 - [ ] User dashboard tests
 - [ ] Authentication flow tests
-- [ ] API endpoint tests (if any are added later)
+- [ ] Jest unit tests for utility functions and hooks
 
 ## Notes
 
