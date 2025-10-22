@@ -444,9 +444,41 @@ model PracticeExam {
 }
 
 // =============================================================================
+// FILE STORAGE (S3 Tracking)
+// =============================================================================
+
+model File {
+  id       String @id @default(cuid())
+  key      String @unique // S3 object key (e.g., "dev/videos/intro.mp4")
+  url      String // Full S3 URL
+
+  // File Metadata
+  fileName    String  @map("file_name") // Original file name
+  fileSize    Int     @map("file_size") // Size in bytes
+  mimeType    String  @map("mime_type") // e.g., "video/mp4", "application/pdf"
+  category    String  // "videos", "pdfs", "images", "thumbnails"
+
+  // Reference Tracking (prevents orphaned files)
+  referencedBy   String? @map("referenced_by") // ID of parent resource (e.g., video_id, document_id)
+  referenceType  String? @map("reference_type") // Type of parent resource (e.g., "video", "document", "thumbnail")
+
+  // Timestamps
+  uploadedBy String? @map("uploaded_by") // User ID who uploaded
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([key])
+  @@index([referencedBy])
+  @@index([referenceType])
+  @@index([category])
+  @@map("files")
+}
+
+// =============================================================================
 // RELATIONSHIPS NOTE
 // =============================================================================
 // All models include proper cascading deletes:
 // - Deleting a Certification cascades to Domains, which cascade to Objectives
 // - Deleting a User cascades to all their progress, attempts, and flashcards
 // - Deleting content (Videos, Questions) cascades to related mappings and attempts
+// - Files are tracked independently to prevent orphans during replacements
