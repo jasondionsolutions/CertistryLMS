@@ -20,7 +20,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { AILoadingModal } from "@/components/ui/AILoadingModal";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { Trash, Archive, FileText } from "lucide-react";
+import { Trash, Archive, FileText, Download } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useCreateCertification } from "../hooks/useCreateCertification";
 import { useUpdateCertification } from "../hooks/useUpdateCertification";
 import { useCreateCertificationWithBlueprint } from "../hooks/useCreateCertificationWithBlueprint";
@@ -28,6 +34,7 @@ import { useDeleteCertification } from "../hooks/useDeleteCertification";
 import { useArchiveCertification } from "../hooks/useArchiveCertification";
 import { createCertificationSchema, updateCertificationSchema } from "../types/certification.schema";
 import { getDomains } from "../serverActions/domain.action";
+import { exportBlueprintAsCSV, exportBlueprintAsJSON } from "../lib/exportBlueprint";
 import { toast } from "sonner";
 
 interface CertificationFormProps {
@@ -142,6 +149,37 @@ export function CertificationForm({
       onOpenChange(false);
       reset();
       onSuccess?.();
+    }
+  };
+
+  const handleExport = async (format: "csv" | "json") => {
+    if (!certification?.id || !certification?.name || !certification?.code) return;
+
+    try {
+      // Fetch domains with full nested structure
+      const domainsResult = await getDomains(certification.id);
+
+      if (!domainsResult.success || !domainsResult.data) {
+        toast.error("Failed to fetch blueprint data");
+        return;
+      }
+
+      const exportData = {
+        certificationName: certification.name,
+        certificationCode: certification.code,
+        domains: domainsResult.data,
+      };
+
+      if (format === "csv") {
+        exportBlueprintAsCSV(exportData);
+        toast.success("Blueprint exported as CSV");
+      } else {
+        exportBlueprintAsJSON(exportData);
+        toast.success("Blueprint exported as JSON");
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Failed to export blueprint");
     }
   };
 
@@ -458,20 +496,38 @@ export function CertificationForm({
           </div>
 
           <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-between items-center w-full">
-            <div>
+            <div className="flex gap-2">
               {isEditing && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    if (certification?.id) {
-                      router.push(`/admin/certifications/${certification.id}/blueprint`);
-                    }
-                  }}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Blueprint
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (certification?.id) {
+                        router.push(`/admin/certifications/${certification.id}/blueprint`);
+                      }
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Blueprint
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button type="button" variant="outline">
+                        <Download className="h-4 w-4 mr-2" />
+                        Export
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleExport("csv")}>
+                        Export as CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport("json")}>
+                        Export as JSON
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
               )}
             </div>
             <div className="flex gap-2">

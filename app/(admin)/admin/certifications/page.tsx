@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Search, MoreVertical, LayoutGrid, List, Edit, Trash, FileText, Archive, ArchiveRestore, Eye, ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
+import { Plus, Search, LayoutGrid, List, Edit, Trash, Archive, ArchiveRestore, Eye, ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
 import { useCertifications } from "@/modules/certifications/hooks/useCertifications";
 import { useDeleteCertification } from "@/modules/certifications/hooks/useDeleteCertification";
 import { useArchiveCertification } from "@/modules/certifications/hooks/useArchiveCertification";
@@ -20,6 +20,7 @@ import { archiveCertification as archiveCertificationAction } from "@/modules/ce
 import { CertificationForm } from "@/modules/certifications/ui/CertificationForm";
 import { CertificationCreationDialog } from "@/modules/certifications/ui/CertificationCreationDialog";
 import { CertificationPDFUploadForm } from "@/modules/certifications/ui/CertificationPDFUploadForm";
+import { DomainWeightChart } from "@/modules/certifications/ui/DomainWeightChart";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -430,37 +431,50 @@ export default function CertificationsPage() {
               {/* Clickable card area */}
               <div
                 onClick={() => handleView(cert)}
-                className="p-4 pb-12 space-y-3 cursor-pointer"
+                className="p-4 pb-12 cursor-pointer"
               >
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    checked={selectedIds.includes(cert.id)}
-                    onCheckedChange={() => handleToggleSelect(cert.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    aria-label={`Select ${cert.name}`}
-                  />
-                  <div className="space-y-1 flex-1">
-                    <h3 className="font-semibold leading-none">{cert.name}</h3>
-                    <p className="text-sm text-muted-foreground">{cert.code}</p>
-                  </div>
-                </div>
+                <div className="flex gap-4">
+                  {/* Left section - Info */}
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        checked={selectedIds.includes(cert.id)}
+                        onCheckedChange={() => handleToggleSelect(cert.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`Select ${cert.name}`}
+                      />
+                      <div className="space-y-1 flex-1">
+                        <h3 className="font-semibold leading-none">{cert.name}</h3>
+                        <p className="text-sm text-muted-foreground">{cert.code}</p>
+                      </div>
+                    </div>
 
-                <div className="space-y-1 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Score:</span>
-                    <span>
-                      {cert.isScoredExam
-                        ? `${cert.passingScore}/${cert.maxScore}`
-                        : "Pass/Fail"}
-                    </span>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Score:</span>
+                        <span>
+                          {cert.isScoredExam
+                            ? `${cert.passingScore}/${cert.maxScore}`
+                            : "Pass/Fail"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Duration:</span>
+                        <span>{cert.defaultStudyDuration} days</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Students:</span>
+                        <span>{cert._count.currentStudents}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Duration:</span>
-                    <span>{cert.defaultStudyDuration} days</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Students:</span>
-                    <span>{cert._count.currentStudents}</span>
+
+                  {/* Right section - Chart */}
+                  <div
+                    className="flex items-center justify-center"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <DomainWeightChart certificationId={cert.id} size={110} />
                   </div>
                 </div>
               </div>
