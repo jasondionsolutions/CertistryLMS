@@ -5,16 +5,25 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Search, MoreVertical, LayoutGrid, List, Edit, Trash, FileText } from "lucide-react";
+import { Plus, Search, MoreVertical, LayoutGrid, List, Edit, Trash, FileText, Archive } from "lucide-react";
 import { useCertifications } from "@/modules/certifications/hooks/useCertifications";
+import { useDeleteCertification } from "@/modules/certifications/hooks/useDeleteCertification";
+import { useArchiveCertification } from "@/modules/certifications/hooks/useArchiveCertification";
+import { deleteCertification as deleteCertificationAction } from "@/modules/certifications/serverActions/certification.action";
+import { archiveCertification as archiveCertificationAction } from "@/modules/certifications/serverActions/certification.action";
 import { CertificationForm } from "@/modules/certifications/ui/CertificationForm";
+import { CertificationCreationDialog } from "@/modules/certifications/ui/CertificationCreationDialog";
+import { CertificationPDFUploadForm } from "@/modules/certifications/ui/CertificationPDFUploadForm";
 import { DeleteCertificationDialog } from "@/modules/certifications/ui/DeleteCertificationDialog";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 type Certification = {
   id: string;
@@ -35,14 +44,20 @@ type Certification = {
 
 export default function CertificationsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = React.useState<"card" | "table">("card");
   const [search, setSearch] = React.useState("");
   const [status, setStatus] = React.useState<"all" | "active" | "inactive" | "archived">("all");
+  const [creationDialogOpen, setCreationDialogOpen] = React.useState(false);
+  const [pdfUploadOpen, setPdfUploadOpen] = React.useState(false);
   const [formOpen, setFormOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [selectedCertification, setSelectedCertification] = React.useState<Certification | null>(null);
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
   const { data: response, isLoading } = useCertifications({ search, status, sortBy: "name", sortOrder: "asc" });
+  const deleteCertification = useDeleteCertification();
+  const archiveCertification = useArchiveCertification();
 
   const certifications = response?.data || [];
 
@@ -57,9 +72,104 @@ export default function CertificationsPage() {
   };
 
   const handleCreateNew = () => {
-    setSelectedCertification(null);
-    setFormOpen(true);
+    setCreationDialogOpen(true);
   };
+
+  const handleCreationModeSelect = (mode: "pdf" | "manual") => {
+    if (mode === "pdf") {
+      setPdfUploadOpen(true);
+    } else {
+      setSelectedCertification(null);
+      setFormOpen(true);
+    }
+  };
+
+  const handlePdfUploadBack = () => {
+    setPdfUploadOpen(false);
+    setCreationDialogOpen(true);
+  };
+
+  // Bulk selection handlers
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === certifications.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(certifications.map((c) => c.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+
+    const count = selectedIds.length;
+    const toastId = toast.loading(`Deleting ${count} certification${count !== 1 ? "s" : ""}...`);
+
+    try {
+      // Execute all deletions in parallel using server actions directly (no individual toasts)
+      const results = await Promise.all(
+        selectedIds.map((id) => deleteCertificationAction({ id }))
+      );
+
+      const failed = results.filter((r) => !r.success);
+      if (failed.length > 0) {
+        toast.error(
+          `Deleted ${count - failed.length} of ${count} certification${count !== 1 ? "s" : ""}`,
+          { id: toastId }
+        );
+      } else {
+        toast.success(`Successfully deleted ${count} certification${count !== 1 ? "s" : ""}`, {
+          id: toastId,
+        });
+      }
+
+      // Invalidate queries to refresh the list
+      queryClient.invalidateQueries({ queryKey: ["certifications"] });
+      setSelectedIds([]);
+    } catch {
+      toast.error(`Failed to delete certifications`, { id: toastId });
+    }
+  };
+
+  const handleBulkArchive = async () => {
+    if (selectedIds.length === 0) return;
+
+    const count = selectedIds.length;
+    const toastId = toast.loading(`Archiving ${count} certification${count !== 1 ? "s" : ""}...`);
+
+    try {
+      // Execute all archives in parallel using server actions directly (no individual toasts)
+      const results = await Promise.all(
+        selectedIds.map((id) => archiveCertificationAction({ id, isArchived: true }))
+      );
+
+      const failed = results.filter((r) => !r.success);
+      if (failed.length > 0) {
+        toast.error(
+          `Archived ${count - failed.length} of ${count} certification${count !== 1 ? "s" : ""}`,
+          { id: toastId }
+        );
+      } else {
+        toast.success(`Successfully archived ${count} certification${count !== 1 ? "s" : ""}`, {
+          id: toastId,
+        });
+      }
+
+      // Invalidate queries to refresh the list
+      queryClient.invalidateQueries({ queryKey: ["certifications"] });
+      setSelectedIds([]);
+    } catch {
+      toast.error(`Failed to archive certifications`, { id: toastId });
+    }
+  };
+
+  const isAllSelected = certifications.length > 0 && selectedIds.length === certifications.length;
+  const isSomeSelected = selectedIds.length > 0 && selectedIds.length < certifications.length;
 
   return (
     <div className="space-y-6">
@@ -123,6 +233,35 @@ export default function CertificationsPage() {
         </div>
       </div>
 
+      {/* Bulk Actions Toolbar */}
+      {selectedIds.length > 0 && (
+        <div className="rounded-lg border bg-muted/50 p-3 flex items-center justify-between">
+          <p className="text-sm font-medium">
+            {selectedIds.length} certification{selectedIds.length !== 1 ? "s" : ""} selected
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBulkArchive}
+              disabled={archiveCertification.isPending}
+            >
+              <Archive className="h-4 w-4 mr-2" />
+              Archive Selected
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={deleteCertification.isPending}
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              Delete Selected
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Loading State */}
       {isLoading && (
         <div className={viewMode === "card" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-2"}>
@@ -156,12 +295,21 @@ export default function CertificationsPage() {
           {certifications.map((cert) => (
             <div
               key={cert.id}
-              className="rounded-lg border bg-card p-4 space-y-3 hover:shadow-md transition-shadow"
+              className={`rounded-lg border bg-card p-4 space-y-3 hover:shadow-md transition-shadow ${
+                selectedIds.includes(cert.id) ? "ring-2 ring-primary" : ""
+              }`}
             >
               <div className="flex items-start justify-between">
-                <div className="space-y-1 flex-1">
-                  <h3 className="font-semibold leading-none">{cert.name}</h3>
-                  <p className="text-sm text-muted-foreground">{cert.code}</p>
+                <div className="flex items-start gap-3 flex-1">
+                  <Checkbox
+                    checked={selectedIds.includes(cert.id)}
+                    onCheckedChange={() => handleToggleSelect(cert.id)}
+                    aria-label={`Select ${cert.name}`}
+                  />
+                  <div className="space-y-1 flex-1">
+                    <h3 className="font-semibold leading-none">{cert.name}</h3>
+                    <p className="text-sm text-muted-foreground">{cert.code}</p>
+                  </div>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -237,6 +385,14 @@ export default function CertificationsPage() {
             <table className="w-full">
               <thead className="border-b bg-muted/50">
                 <tr>
+                  <th className="w-12 p-3" role="columnheader">
+                    <Checkbox
+                      checked={isAllSelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all certifications"
+                      className={isSomeSelected && !isAllSelected ? "opacity-50" : ""}
+                    />
+                  </th>
                   <th className="text-left p-3 font-medium" role="columnheader">Name</th>
                   <th className="text-left p-3 font-medium" role="columnheader">Code</th>
                   <th className="text-left p-3 font-medium" role="columnheader">Score</th>
@@ -247,7 +403,19 @@ export default function CertificationsPage() {
               </thead>
               <tbody>
                 {certifications.map((cert) => (
-                  <tr key={cert.id} className="border-b last:border-0 hover:bg-muted/30">
+                  <tr
+                    key={cert.id}
+                    className={`border-b last:border-0 hover:bg-muted/30 ${
+                      selectedIds.includes(cert.id) ? "bg-muted/50" : ""
+                    }`}
+                  >
+                    <td className="p-3">
+                      <Checkbox
+                        checked={selectedIds.includes(cert.id)}
+                        onCheckedChange={() => handleToggleSelect(cert.id)}
+                        aria-label={`Select ${cert.name}`}
+                      />
+                    </td>
                     <td className="p-3 font-medium">{cert.name}</td>
                     <td className="p-3 text-muted-foreground">{cert.code}</td>
                     <td className="p-3">
@@ -315,6 +483,18 @@ export default function CertificationsPage() {
       )}
 
       {/* Dialogs */}
+      <CertificationCreationDialog
+        open={creationDialogOpen}
+        onOpenChange={setCreationDialogOpen}
+        onSelectMode={handleCreationModeSelect}
+      />
+
+      <CertificationPDFUploadForm
+        open={pdfUploadOpen}
+        onOpenChange={setPdfUploadOpen}
+        onBack={handlePdfUploadBack}
+      />
+
       <CertificationForm
         open={formOpen}
         onOpenChange={setFormOpen}
@@ -325,6 +505,7 @@ export default function CertificationsPage() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         certification={selectedCertification}
+        onSuccess={() => setSelectedCertification(null)}
       />
     </div>
   );

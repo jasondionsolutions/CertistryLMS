@@ -25,12 +25,14 @@ interface DeleteCertificationDialogProps {
     name: string;
     code: string;
   } | null;
+  onSuccess?: () => void;
 }
 
 export function DeleteCertificationDialog({
   open,
   onOpenChange,
   certification,
+  onSuccess,
 }: DeleteCertificationDialogProps) {
   const [deleteCheck, setDeleteCheck] = React.useState<{
     canDelete: boolean;
@@ -68,6 +70,7 @@ export function DeleteCertificationDialog({
     if (deleteCheck?.canDelete) {
       await deleteCertification.mutateAsync({ id: certification.id });
       onOpenChange(false);
+      onSuccess?.();
     }
   };
 
@@ -79,6 +82,7 @@ export function DeleteCertificationDialog({
       isArchived: true,
     });
     onOpenChange(false);
+    onSuccess?.();
   };
 
   if (!certification) return null;

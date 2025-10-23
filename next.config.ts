@@ -3,6 +3,13 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
+  // Configure Server Actions for PDF upload (5MB PDFs + base64 encoding overhead)
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "10mb", // Allows for 5MB PDFs encoded as base64
+    },
+  },
+
   images: {
     // This allows using <Image /> with external URLs
     remotePatterns: [

@@ -246,73 +246,79 @@ export function DomainsEditor({ domains, onChange, isEditable = true }: DomainsE
             value={`domain-${domainIndex}`}
             className="border rounded-lg !border-b"
           >
-            <AccordionTrigger className="px-4 hover:no-underline">
-              <div className="flex items-center justify-between w-full pr-4">
-                <div className="flex items-center gap-3 text-left flex-1">
-                  {editingDomainIndex === domainIndex ? (
-                    <div className="flex-1 space-y-3" onClick={(e) => e.stopPropagation()}>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-xs">Domain Name</Label>
-                          <Input
-                            value={editDomainForm.name}
-                            onChange={(e) => setEditDomainForm({ ...editDomainForm, name: e.target.value })}
-                            placeholder="Domain name"
-                            className="h-8"
-                          />
+            <div className="relative">
+              <AccordionTrigger className="px-4 hover:no-underline">
+                <div className="flex items-center justify-between w-full pr-4">
+                  <div className="flex items-center gap-3 text-left flex-1">
+                    {editingDomainIndex === domainIndex ? (
+                      <div className="flex-1 space-y-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs">Domain Name</Label>
+                            <Input
+                              value={editDomainForm.name}
+                              onChange={(e) => setEditDomainForm({ ...editDomainForm, name: e.target.value })}
+                              placeholder="Domain name"
+                              className="h-8"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Weight (%)</Label>
+                            <Input
+                              type="number"
+                              value={(editDomainForm.weight * 100).toString()}
+                              onChange={(e) => setEditDomainForm({ ...editDomainForm, weight: parseFloat(e.target.value) / 100 })}
+                              placeholder="25"
+                              className="h-8"
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <Label className="text-xs">Weight (%)</Label>
-                          <Input
-                            type="number"
-                            value={(editDomainForm.weight * 100).toString()}
-                            onChange={(e) => setEditDomainForm({ ...editDomainForm, weight: parseFloat(e.target.value) / 100 })}
-                            placeholder="25"
-                            className="h-8"
-                          />
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={handleSaveDomain} className="h-7">
+                            <Check className="h-3 w-3 mr-1" />
+                            Save
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={handleCancelDomainEdit} className="h-7">
+                            <X className="h-3 w-3 mr-1" />
+                            Cancel
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={handleSaveDomain} className="h-7">
-                          <Check className="h-3 w-3 mr-1" />
-                          Save
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={handleCancelDomainEdit} className="h-7">
-                          <X className="h-3 w-3 mr-1" />
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <span className="font-semibold">Domain {domainIndex + 1}</span>
-                      <span className="font-normal">{domain.name}</span>
-                      <span className="text-sm text-muted-foreground">({Math.round(domain.weight * 100)}%)</span>
-                    </>
-                  )}
-                </div>
-                {isEditable && editingDomainIndex !== domainIndex && (
-                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => handleEditDomain(domainIndex)}
-                      className="h-7 w-7"
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => handleRemoveDomain(domainIndex)}
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    ) : (
+                      <>
+                        <span className="font-semibold">Domain {domainIndex + 1}</span>
+                        <span className="font-normal">{domain.name}</span>
+                        <span className="text-sm text-muted-foreground">({Math.round(domain.weight * 100)}%)</span>
+                      </>
+                    )}
                   </div>
-                )}
-              </div>
-            </AccordionTrigger>
+                </div>
+              </AccordionTrigger>
+              {isEditable && editingDomainIndex !== domainIndex && (
+                <div className="absolute right-12 top-1/2 -translate-y-1/2 flex gap-1 z-10">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditDomain(domainIndex);
+                    }}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveDomain(domainIndex);
+                    }}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-destructive/10 text-destructive"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+            </div>
             <AccordionContent className="px-4 pb-4">
               <div className="space-y-2 pt-2">
                 <div className="flex items-center justify-between mb-3">

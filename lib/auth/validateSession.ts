@@ -31,6 +31,13 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "certifications.delete",
     "certifications.manage",
 
+    // AI Models management
+    "ai_models.read",
+    "ai_models.create",
+    "ai_models.update",
+    "ai_models.delete",
+    "ai_models.manage",
+
     // Content management
     "content.read",
     "content.create",

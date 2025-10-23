@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight, Home } from "lucide-react";
 import { Fragment } from "react";
+import { useBreadcrumb } from "./breadcrumb-context";
 
 /**
  * Convert URL segment to readable label
@@ -18,9 +19,11 @@ function segmentToLabel(segment: string): string {
 /**
  * Breadcrumb Navigation Component
  * Automatically generates breadcrumbs from current URL path
+ * Uses custom labels from BreadcrumbContext if available
  */
 export function Breadcrumb() {
   const pathname = usePathname();
+  const { customLabels } = useBreadcrumb();
 
   // Split pathname into segments and filter out empty strings
   const segments = pathname.split("/").filter(Boolean);
@@ -33,7 +36,8 @@ export function Breadcrumb() {
   // Build breadcrumb items
   const breadcrumbs = segments.map((segment, index) => {
     const href = "/" + segments.slice(0, index + 1).join("/");
-    const label = segmentToLabel(segment);
+    // Use custom label if available, otherwise convert segment to label
+    const label = customLabels[segment] || segmentToLabel(segment);
     const isLast = index === segments.length - 1;
 
     return {

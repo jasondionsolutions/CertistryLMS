@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 interface AILoadingModalProps {
   isOpen: boolean;
   title: string;
-  message?: string;
+  message?: React.ReactNode;
   estimatedDuration?: number; // in seconds
 }
 
@@ -71,7 +71,7 @@ export function AILoadingModal({
           {/* Content */}
           <div className="text-center space-y-3 w-full">
             <h3 className="text-lg font-semibold">{title}</h3>
-            {message && <p className="text-sm text-muted-foreground">{message}</p>}
+            {message && <div className="text-sm text-muted-foreground">{message}</div>}
 
             {/* Progress Bar */}
             {progressPercentage !== null && (

@@ -18,15 +18,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AILoadingModal } from "@/components/ui/AILoadingModal";
 import { useCreateCertification } from "../hooks/useCreateCertification";
 import { useUpdateCertification } from "../hooks/useUpdateCertification";
+import { useCreateCertificationWithBlueprint } from "../hooks/useCreateCertificationWithBlueprint";
 import { createCertificationSchema, updateCertificationSchema } from "../types/certification.schema";
 
 interface CertificationFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   certification?: {
-    id: string;
+    id?: string;
     name: string;
     code: string;
     description: string | null;
@@ -36,15 +38,24 @@ interface CertificationFormProps {
     defaultStudyDuration: number;
     isActive: boolean;
   };
+  blueprintData?: any[]; // Blueprint domains from AI extraction
+  onSuccess?: () => void;
+  mode?: "create" | "edit" | "review";
 }
 
 export function CertificationForm({
   open,
   onOpenChange,
   certification,
+  blueprintData,
+  onSuccess,
+  mode,
 }: CertificationFormProps) {
-  const isEditing = !!certification;
+  const isEditing = !!certification?.id;
+  const isReview = mode === "review";
+  const hasBlueprint = !!blueprintData && blueprintData.length > 0;
   const createCertification = useCreateCertification();
+  const createWithBlueprint = useCreateCertificationWithBlueprint();
   const updateCertification = useUpdateCertification();
 
   const {
@@ -82,25 +93,104 @@ export function CertificationForm({
       if (result.success) {
         onOpenChange(false);
         reset();
+        onSuccess?.();
       }
     } else {
-      const result = await createCertification.mutateAsync(data);
-      if (result.success) {
-        onOpenChange(false);
-        reset();
+      // If we have blueprint data, create certification with blueprint
+      if (hasBlueprint) {
+        const result = await createWithBlueprint.mutateAsync({
+          ...data,
+          domains: blueprintData,
+        });
+        if (result.success) {
+          onOpenChange(false);
+          reset();
+          onSuccess?.();
+        }
+      } else {
+        // Otherwise, create certification without blueprint
+        const result = await createCertification.mutateAsync(data);
+        if (result.success) {
+          onOpenChange(false);
+          reset();
+          onSuccess?.();
+        }
       }
     }
   };
 
+  // Calculate blueprint complexity for loading estimation
+  const getBlueprintStats = () => {
+    if (!blueprintData) return { objectives: 0, bullets: 0, subBullets: 0 };
+
+    let objectives = 0;
+    let bullets = 0;
+    let subBullets = 0;
+
+    blueprintData.forEach((domain) => {
+      objectives += domain.objectives?.length || 0;
+      domain.objectives?.forEach((obj: any) => {
+        bullets += obj.bullets?.length || 0;
+        obj.bullets?.forEach((bullet: any) => {
+          subBullets += bullet.subBullets?.length || 0;
+        });
+      });
+    });
+
+    return { objectives, bullets, subBullets };
+  };
+
+  const stats = getBlueprintStats();
+  const totalItems = (blueprintData?.length || 0) + stats.objectives + stats.bullets + stats.subBullets;
+  // Estimate: ~0.3 seconds per item (domain/objective/bullet/sub-bullet)
+  const estimatedDuration = Math.max(30, Math.min(120, Math.ceil(totalItems * 0.3)));
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      {/* Saving Progress Modal */}
+      <AILoadingModal
+        isOpen={createWithBlueprint.isPending}
+        title="Saving Certification & Blueprint"
+        estimatedDuration={estimatedDuration}
+        message={
+          <>
+            <p className="mb-2">
+              Creating certification and importing blueprint structure:
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-sm">
+              <li>{blueprintData?.length || 0} domain{blueprintData?.length !== 1 ? "s" : ""}</li>
+              <li>{stats.objectives} objective{stats.objectives !== 1 ? "s" : ""}</li>
+              {stats.bullets > 0 && <li>{stats.bullets} bullet point{stats.bullets !== 1 ? "s" : ""}</li>}
+              {stats.subBullets > 0 && <li>{stats.subBullets} sub-bullet{stats.subBullets !== 1 ? "s" : ""}</li>}
+            </ul>
+            <p className="mt-4 text-sm opacity-70">
+              Large blueprints may take up to 2 minutes to save completely
+            </p>
+          </>
+        }
+      />
+
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Certification" : "Create Certification"}</DialogTitle>
+          <DialogTitle>
+            {isReview
+              ? "Review Extracted Data"
+              : isEditing
+              ? "Edit Certification"
+              : "Create Certification"}
+          </DialogTitle>
           <DialogDescription>
-            {isEditing
+            {isReview
+              ? "Review and edit the certification details extracted from the PDF."
+              : isEditing
               ? "Update the certification details below."
               : "Add a new certification program to the system."}
+            {hasBlueprint && !isEditing && (
+              <span className="block mt-1 text-primary font-medium">
+                Blueprint with {blueprintData.length} domain{blueprintData.length !== 1 ? "s" : ""} will be imported
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -259,5 +349,6 @@ export function CertificationForm({
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

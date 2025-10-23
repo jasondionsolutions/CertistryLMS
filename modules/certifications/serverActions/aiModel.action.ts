@@ -294,3 +294,90 @@ export const listAIModels = withPermission("ai_models.read")(
     }
   }
 );
+
+/**
+ * Sync AI models from Anthropic API
+ * Creates new models and updates existing ones
+ * Requires admin permission
+ */
+export const syncAIModels = withPermission("ai_models.manage")(
+  async (_user: AuthContext): Promise<{
+    success: boolean;
+    data?: { newModels: number; updatedModels: number };
+    error?: string;
+  }> => {
+    try {
+      // Dynamic import to avoid circular dependencies
+      const { fetchAnthropicModels } = await import("./fetchModels.action");
+
+      // Fetch models from Anthropic API
+      const fetchResult = await fetchAnthropicModels();
+
+      if (!fetchResult.success || !fetchResult.data) {
+        return {
+          success: false,
+          error: fetchResult.error || "Failed to fetch models from Anthropic API",
+        };
+      }
+
+      const fetchedModels = fetchResult.data;
+      let newModels = 0;
+      let updatedModels = 0;
+
+      // Process each fetched model
+      for (const model of fetchedModels) {
+        // Check if model already exists
+        const existing = await prisma.aIModel.findUnique({
+          where: { modelId: model.modelId },
+        });
+
+        if (existing) {
+          // Update existing model (preserve isActive state)
+          await prisma.aIModel.update({
+            where: { id: existing.id },
+            data: {
+              name: model.displayName,
+              description: model.description,
+              // Keep existing isActive state
+            },
+          });
+          updatedModels++;
+        } else {
+          // Create new model (disabled by default)
+          await prisma.aIModel.create({
+            data: {
+              name: model.displayName,
+              modelId: model.modelId,
+              provider: "anthropic",
+              description: model.description,
+              isActive: false, // New models are disabled by default
+            },
+          });
+          newModels++;
+        }
+      }
+
+      revalidatePath("/admin/ai-models");
+
+      return {
+        success: true,
+        data: {
+          newModels,
+          updatedModels,
+        },
+      };
+    } catch (error) {
+      console.error("Error syncing AI models:", error);
+      if (error instanceof Error) {
+        return {
+          success: false,
+          error: error.message,
+        };
+      }
+      return {
+        success: false,
+        error: "An unexpected error occurred while syncing AI models",
+      };
+    }
+  }
+);
