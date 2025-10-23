@@ -27,6 +27,8 @@ import { useCreateCertificationWithBlueprint } from "../hooks/useCreateCertifica
 import { useDeleteCertification } from "../hooks/useDeleteCertification";
 import { useArchiveCertification } from "../hooks/useArchiveCertification";
 import { createCertificationSchema, updateCertificationSchema } from "../types/certification.schema";
+import { getDomains } from "../serverActions/domain.action";
+import { toast } from "sonner";
 
 interface CertificationFormProps {
   open: boolean;
@@ -144,6 +146,26 @@ export function CertificationForm({
   };
 
   const handleActiveToggle = async (checked: boolean) => {
+    // If trying to activate, validate domain weights first
+    if (checked && certification?.id) {
+      const domainsResult = await getDomains(certification.id);
+
+      if (domainsResult.success && domainsResult.data) {
+        const totalWeight = domainsResult.data.reduce((sum, d) => sum + (d.weight || 0), 0);
+        const totalPercentage = Math.round(totalWeight * 100 * 10) / 10;
+        const isWeightValid = totalPercentage >= 99.5 && totalPercentage <= 100.5;
+
+        if (!isWeightValid) {
+          toast.error(
+            `Cannot activate certification: Domain weights must sum to 100%. Current total: ${totalPercentage}%`,
+            { duration: 5000 }
+          );
+          setValue("isActive", false);
+          return;
+        }
+      }
+    }
+
     setValue("isActive", checked);
 
     // Auto-save if editing an existing certification

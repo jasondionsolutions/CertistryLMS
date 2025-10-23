@@ -690,6 +690,20 @@ export const bulkImportDomains = withPermission("certifications.update")(
         timeout: 30000, // 30 seconds timeout for large blueprints
       });
 
+      // Validate domain weights and force certification inactive if invalid
+      const totalWeight = validated.domains.reduce((sum, d) => sum + (d.weight || 0), 0);
+      const totalPercentage = Math.round(totalWeight * 100 * 10) / 10; // Round to 1 decimal
+      const isWeightValid = totalPercentage >= 99.5 && totalPercentage <= 100.5;
+
+      // If weights are invalid, force certification to inactive
+      if (!isWeightValid) {
+        await prisma.certification.update({
+          where: { id: validated.certificationId },
+          data: { isActive: false },
+        });
+        console.error(`Domain weights invalid (${totalPercentage}%). Certification forced to inactive.`);
+      }
+
       revalidatePath(`/admin/certifications/${validated.certificationId}/blueprint`);
 
       return {

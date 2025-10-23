@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Pencil, Trash2, Plus, Check, X } from "lucide-react";
+import { Pencil, Trash2, Plus, Check, X, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Domain type from our schema
 interface SubBullet {
@@ -72,6 +73,11 @@ export function DomainsEditor({ domains, onChange, isEditable = true }: DomainsE
   const [editObjectiveForm, setEditObjectiveForm] = useState<{ code: string; description: string; difficulty: string }>({ code: "", description: "", difficulty: "intermediate" });
   const [editBulletForm, setEditBulletForm] = useState<{ text: string }>({ text: "" });
   const [editSubBulletForm, setEditSubBulletForm] = useState<{ text: string }>({ text: "" });
+
+  // Weight validation
+  const totalWeight = domains.reduce((sum, domain) => sum + (domain.weight || 0), 0);
+  const totalPercentage = Math.round(totalWeight * 100 * 10) / 10; // Round to 1 decimal place
+  const isWeightValid = totalPercentage >= 99.5 && totalPercentage <= 100.5;
 
   // Domain operations
   const handleEditDomain = (index: number) => {
@@ -330,6 +336,18 @@ export function DomainsEditor({ domains, onChange, isEditable = true }: DomainsE
 
   return (
     <div className="space-y-4">
+      {/* Weight Validation Warning */}
+      {!isWeightValid && domains.length > 0 && (
+        <Alert variant="destructive" className="bg-yellow-50 border-yellow-300 dark:bg-yellow-950 dark:border-yellow-800">
+          <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+          <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+            <strong>Domain weights must sum to 100%.</strong>
+            {" "}Current total: <strong>{totalPercentage}%</strong>
+            {" "}(certification will be saved as inactive)
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Accordion type="multiple" className="space-y-2">
         {domains.map((domain, domainIndex) => {
           const isEditingThisDomain = editingDomainIndex === domainIndex;
