@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Search, MoreVertical, LayoutGrid, List, Edit, Trash, FileText, Archive } from "lucide-react";
+import { Plus, Search, MoreVertical, LayoutGrid, List, Edit, Trash, FileText, Archive, ArchiveRestore, Eye, ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
 import { useCertifications } from "@/modules/certifications/hooks/useCertifications";
 import { useDeleteCertification } from "@/modules/certifications/hooks/useDeleteCertification";
 import { useArchiveCertification } from "@/modules/certifications/hooks/useArchiveCertification";
@@ -21,7 +20,7 @@ import { archiveCertification as archiveCertificationAction } from "@/modules/ce
 import { CertificationForm } from "@/modules/certifications/ui/CertificationForm";
 import { CertificationCreationDialog } from "@/modules/certifications/ui/CertificationCreationDialog";
 import { CertificationPDFUploadForm } from "@/modules/certifications/ui/CertificationPDFUploadForm";
-import { DeleteCertificationDialog } from "@/modules/certifications/ui/DeleteCertificationDialog";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -43,32 +42,85 @@ type Certification = {
 };
 
 export default function CertificationsPage() {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = React.useState<"card" | "table">("card");
   const [search, setSearch] = React.useState("");
   const [status, setStatus] = React.useState<"all" | "active" | "inactive" | "archived">("all");
+  const [sortBy, setSortBy] = React.useState<"name" | "code">("name");
+  const [sortOrder, setSortOrder] = React.useState<"asc" | "desc">("asc");
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize] = React.useState(10);
   const [creationDialogOpen, setCreationDialogOpen] = React.useState(false);
   const [pdfUploadOpen, setPdfUploadOpen] = React.useState(false);
   const [formOpen, setFormOpen] = React.useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [formInEditMode, setFormInEditMode] = React.useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = React.useState(false);
   const [selectedCertification, setSelectedCertification] = React.useState<Certification | null>(null);
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
-  const { data: response, isLoading } = useCertifications({ search, status, sortBy: "name", sortOrder: "asc" });
+  const { data: response, isLoading } = useCertifications({ search, status, sortBy, sortOrder });
   const deleteCertification = useDeleteCertification();
   const archiveCertification = useArchiveCertification();
 
   const certifications = response?.data || [];
 
-  const handleEdit = (cert: Certification) => {
+  // Sorting handler
+  const handleSort = (column: "name" | "code") => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("asc");
+    }
+    setCurrentPage(1); // Reset to first page when sorting changes
+  };
+
+  // Pagination for table view
+  const totalPages = Math.ceil(certifications.length / pageSize);
+  const paginatedCertifications = viewMode === "table"
+    ? certifications.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    : certifications;
+
+  const handleView = (cert: Certification) => {
     setSelectedCertification(cert);
+    setFormInEditMode(false);
     setFormOpen(true);
   };
 
-  const handleDelete = (cert: Certification) => {
+  const handleEdit = (cert: Certification) => {
     setSelectedCertification(cert);
-    setDeleteDialogOpen(true);
+    setFormInEditMode(true);
+    setFormOpen(true);
+  };
+
+  const handleDeleteClick = (cert: Certification) => {
+    setSelectedCertification(cert);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleArchiveClick = (cert: Certification) => {
+    setSelectedCertification(cert);
+    setShowArchiveConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedCertification?.id) return;
+    const result = await deleteCertification.mutateAsync({ id: selectedCertification.id });
+    if (result.success) {
+      setSelectedCertification(null);
+    }
+  };
+
+  const confirmArchive = async () => {
+    if (!selectedCertification?.id) return;
+    const result = await archiveCertification.mutateAsync({
+      id: selectedCertification.id,
+      isArchived: true
+    });
+    if (result.success) {
+      setSelectedCertification(null);
+    }
   };
 
   const handleCreateNew = () => {
@@ -168,8 +220,56 @@ export default function CertificationsPage() {
     }
   };
 
+  const handleBulkUnarchive = async () => {
+    if (selectedIds.length === 0) return;
+
+    const count = selectedIds.length;
+    const toastId = toast.loading(`Unarchiving ${count} certification${count !== 1 ? "s" : ""}...`);
+
+    try {
+      // Execute all unarchives in parallel using server actions directly (no individual toasts)
+      const results = await Promise.all(
+        selectedIds.map((id) => archiveCertificationAction({ id, isArchived: false }))
+      );
+
+      const failed = results.filter((r) => !r.success);
+      if (failed.length > 0) {
+        toast.error(
+          `Unarchived ${count - failed.length} of ${count} certification${count !== 1 ? "s" : ""}`,
+          { id: toastId }
+        );
+      } else {
+        toast.success(`Successfully unarchived ${count} certification${count !== 1 ? "s" : ""}`, {
+          id: toastId,
+        });
+      }
+
+      // Invalidate queries to refresh the list
+      queryClient.invalidateQueries({ queryKey: ["certifications"] });
+      setSelectedIds([]);
+    } catch {
+      toast.error(`Failed to unarchive certifications`, { id: toastId });
+    }
+  };
+
   const isAllSelected = certifications.length > 0 && selectedIds.length === certifications.length;
   const isSomeSelected = selectedIds.length > 0 && selectedIds.length < certifications.length;
+
+  // Reset to first page when search or status changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [search, status]);
+
+  // Ensure clean state when modal closes
+  React.useEffect(() => {
+    if (!formOpen && !showDeleteConfirm && !showArchiveConfirm) {
+      // Small delay to ensure modal overlay is fully removed
+      const timer = setTimeout(() => {
+        setSelectedCertification(null);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [formOpen, showDeleteConfirm, showArchiveConfirm]);
 
   return (
     <div className="space-y-6">
@@ -183,7 +283,7 @@ export default function CertificationsPage() {
         </div>
         <Button onClick={handleCreateNew}>
           <Plus className="h-4 w-4 mr-2" />
-          New Certification
+          Create New Certification
         </Button>
       </div>
 
@@ -250,6 +350,15 @@ export default function CertificationsPage() {
               Archive Selected
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBulkUnarchive}
+              disabled={archiveCertification.isPending}
+            >
+              <ArchiveRestore className="h-4 w-4 mr-2" />
+              Unarchive Selected
+            </Button>
+            <Button
               variant="destructive"
               size="sm"
               onClick={handleBulkDelete}
@@ -291,72 +400,16 @@ export default function CertificationsPage() {
 
       {/* Card View */}
       {!isLoading && certifications.length > 0 && viewMode === "card" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" key={`cards-${formOpen}`}>
           {certifications.map((cert) => (
             <div
               key={cert.id}
-              className={`rounded-lg border bg-card p-4 space-y-3 hover:shadow-md transition-shadow ${
+              className={`relative rounded-lg border bg-card hover:shadow-md transition-shadow ${
                 selectedIds.includes(cert.id) ? "ring-2 ring-primary" : ""
               }`}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3 flex-1">
-                  <Checkbox
-                    checked={selectedIds.includes(cert.id)}
-                    onCheckedChange={() => handleToggleSelect(cert.id)}
-                    aria-label={`Select ${cert.name}`}
-                  />
-                  <div className="space-y-1 flex-1">
-                    <h3 className="font-semibold leading-none">{cert.name}</h3>
-                    <p className="text-sm text-muted-foreground">{cert.code}</p>
-                  </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" aria-label="Actions">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => router.push(`/admin/certifications/${cert.id}/blueprint`)}>
-                      <FileText className="h-4 w-4 mr-2" />
-                      Manage Blueprint
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleEdit(cert)}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleDelete(cert)}
-                      className="text-destructive"
-                    >
-                      <Trash className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <div className="space-y-1 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Score:</span>
-                  <span>
-                    {cert.isScoredExam
-                      ? `${cert.passingScore}/${cert.maxScore}`
-                      : "Pass/Fail"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Duration:</span>
-                  <span>{cert.defaultStudyDuration} days</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Students:</span>
-                  <span>{cert._count.currentStudents}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
+              {/* Badge in bottom left corner */}
+              <div className="absolute bottom-3 left-3 z-10">
                 {cert.isActive && !cert.isArchived && (
                   <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
                     Active
@@ -373,6 +426,44 @@ export default function CertificationsPage() {
                   </span>
                 )}
               </div>
+
+              {/* Clickable card area */}
+              <div
+                onClick={() => handleView(cert)}
+                className="p-4 pb-12 space-y-3 cursor-pointer"
+              >
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    checked={selectedIds.includes(cert.id)}
+                    onCheckedChange={() => handleToggleSelect(cert.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`Select ${cert.name}`}
+                  />
+                  <div className="space-y-1 flex-1">
+                    <h3 className="font-semibold leading-none">{cert.name}</h3>
+                    <p className="text-sm text-muted-foreground">{cert.code}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Score:</span>
+                    <span>
+                      {cert.isScoredExam
+                        ? `${cert.passingScore}/${cert.maxScore}`
+                        : "Pass/Fail"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Duration:</span>
+                    <span>{cert.defaultStudyDuration} days</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Students:</span>
+                    <span>{cert._count.currentStudents}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -380,99 +471,175 @@ export default function CertificationsPage() {
 
       {/* Table View */}
       {!isLoading && certifications.length > 0 && viewMode === "table" && (
-        <div className="rounded-lg border">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b bg-muted/50">
-                <tr>
-                  <th className="w-12 p-3" role="columnheader">
-                    <Checkbox
-                      checked={isAllSelected}
-                      onCheckedChange={handleSelectAll}
-                      aria-label="Select all certifications"
-                      className={isSomeSelected && !isAllSelected ? "opacity-50" : ""}
-                    />
-                  </th>
-                  <th className="text-left p-3 font-medium" role="columnheader">Name</th>
-                  <th className="text-left p-3 font-medium" role="columnheader">Code</th>
-                  <th className="text-left p-3 font-medium" role="columnheader">Score</th>
-                  <th className="text-left p-3 font-medium" role="columnheader">Duration</th>
-                  <th className="text-left p-3 font-medium" role="columnheader">Status</th>
-                  <th className="text-right p-3 font-medium" role="columnheader">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {certifications.map((cert) => (
-                  <tr
-                    key={cert.id}
-                    className={`border-b last:border-0 hover:bg-muted/30 ${
-                      selectedIds.includes(cert.id) ? "bg-muted/50" : ""
-                    }`}
-                  >
-                    <td className="p-3">
+        <>
+          <div className="rounded-lg border">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b bg-muted/50">
+                  <tr>
+                    <th className="w-12 p-3" role="columnheader">
                       <Checkbox
-                        checked={selectedIds.includes(cert.id)}
-                        onCheckedChange={() => handleToggleSelect(cert.id)}
-                        aria-label={`Select ${cert.name}`}
+                        checked={isAllSelected}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Select all certifications"
+                        className={isSomeSelected && !isAllSelected ? "opacity-50" : ""}
                       />
-                    </td>
-                    <td className="p-3 font-medium">{cert.name}</td>
-                    <td className="p-3 text-muted-foreground">{cert.code}</td>
-                    <td className="p-3">
-                      {cert.isScoredExam
-                        ? `${cert.passingScore}/${cert.maxScore}`
-                        : "Pass/Fail"}
-                    </td>
-                    <td className="p-3">{cert.defaultStudyDuration} days</td>
-                    <td className="p-3">
-                      {cert.isActive && !cert.isArchived && (
-                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-                          Active
-                        </span>
-                      )}
-                      {!cert.isActive && !cert.isArchived && (
-                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                          Inactive
-                        </span>
-                      )}
-                      {cert.isArchived && (
-                        <span className="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">
-                          Archived
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" aria-label="Actions">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => router.push(`/admin/certifications/${cert.id}/blueprint`)}>
-                            <FileText className="h-4 w-4 mr-2" />
-                            Manage Blueprint
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEdit(cert)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDelete(cert)}
-                            className="text-destructive"
-                          >
-                            <Trash className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
+                    </th>
+                    <th className="text-left p-3 font-medium w-32" role="columnheader">Actions</th>
+                    <th
+                      className="text-left p-3 font-medium cursor-pointer hover:bg-muted/70"
+                      role="columnheader"
+                      onClick={() => handleSort("name")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Name
+                        <ArrowUpDown className="h-4 w-4" />
+                      </div>
+                    </th>
+                    <th
+                      className="text-left p-3 font-medium cursor-pointer hover:bg-muted/70"
+                      role="columnheader"
+                      onClick={() => handleSort("code")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Code
+                        <ArrowUpDown className="h-4 w-4" />
+                      </div>
+                    </th>
+                    <th className="text-left p-3 font-medium" role="columnheader">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paginatedCertifications.map((cert) => {
+                    const hasEnrolledStudents = (cert._count?.currentStudents ?? 0) > 0;
+                    const showArchive = hasEnrolledStudents;
+                    const showDelete = !hasEnrolledStudents;
+
+                    return (
+                      <tr
+                        key={cert.id}
+                        className={`border-b last:border-0 hover:bg-muted/30 ${
+                          selectedIds.includes(cert.id) ? "bg-muted/50" : ""
+                        }`}
+                      >
+                        <td className="p-3">
+                          <Checkbox
+                            checked={selectedIds.includes(cert.id)}
+                            onCheckedChange={() => handleToggleSelect(cert.id)}
+                            aria-label={`Select ${cert.name}`}
+                          />
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleView(cert)}
+                              aria-label="View certification"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(cert)}
+                              aria-label="Edit certification"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            {showDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteClick(cert)}
+                                className="text-destructive hover:text-destructive"
+                                aria-label="Delete certification"
+                              >
+                                <Trash className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {showArchive && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleArchiveClick(cert)}
+                                className="text-orange-600 hover:text-orange-600"
+                                aria-label="Archive certification"
+                              >
+                                <Archive className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3 font-medium">{cert.name}</td>
+                        <td className="p-3 text-muted-foreground">{cert.code}</td>
+                        <td className="p-3">
+                          {cert.isActive && !cert.isArchived && (
+                            <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                              Active
+                            </span>
+                          )}
+                          {!cert.isActive && !cert.isArchived && (
+                            <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                              Inactive
+                            </span>
+                          )}
+                          {cert.isArchived && (
+                            <span className="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">
+                              Archived
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, certifications.length)} of {certifications.length} certifications
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className="w-8 h-8 p-0"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Results Count */}
@@ -497,15 +664,41 @@ export default function CertificationsPage() {
 
       <CertificationForm
         open={formOpen}
-        onOpenChange={setFormOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) {
+            setSelectedCertification(null);
+            setFormInEditMode(false);
+          }
+        }}
         certification={selectedCertification || undefined}
+        startInEditMode={formInEditMode}
       />
 
-      <DeleteCertificationDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        certification={selectedCertification}
-        onSuccess={() => setSelectedCertification(null)}
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Certification"
+        description={`You are about to permanently delete "${selectedCertification?.name} (${selectedCertification?.code})".\n\nThis action cannot be undone and will delete all blueprint data.`}
+        confirmText="Delete"
+        requireTypedConfirmation={true}
+        confirmationWord="Confirm"
+        onConfirm={confirmDelete}
+        variant="danger"
+      />
+
+      {/* Archive Confirmation Dialog */}
+      <ConfirmationDialog
+        open={showArchiveConfirm}
+        onOpenChange={setShowArchiveConfirm}
+        title="Archive Certification"
+        description={`You are about to archive "${selectedCertification?.name} (${selectedCertification?.code})".\n\nThis certification will be hidden from active students and cannot be re-assigned.`}
+        confirmText="Archive"
+        requireTypedConfirmation={true}
+        confirmationWord="Confirm"
+        onConfirm={confirmArchive}
+        variant="warning"
       />
     </div>
   );

@@ -17,9 +17,18 @@ function segmentToLabel(segment: string): string {
 }
 
 /**
+ * Check if a segment looks like a CUID (database ID)
+ * CUIDs typically start with 'c' followed by 24 alphanumeric characters
+ */
+function isCuid(segment: string): boolean {
+  return /^c[a-z0-9]{24}$/i.test(segment);
+}
+
+/**
  * Breadcrumb Navigation Component
  * Automatically generates breadcrumbs from current URL path
  * Uses custom labels from BreadcrumbContext if available
+ * Skips ID segments (CUIDs) to avoid creating links to non-existent pages
  */
 export function Breadcrumb() {
   const pathname = usePathname();
@@ -33,19 +42,24 @@ export function Breadcrumb() {
     return null;
   }
 
-  // Build breadcrumb items
-  const breadcrumbs = segments.map((segment, index) => {
-    const href = "/" + segments.slice(0, index + 1).join("/");
-    // Use custom label if available, otherwise convert segment to label
-    const label = customLabels[segment] || segmentToLabel(segment);
-    const isLast = index === segments.length - 1;
+  // Build breadcrumb items, skipping ID segments
+  const breadcrumbs = segments
+    .filter((segment) => !isCuid(segment)) // Skip database IDs
+    .map((segment, index, filteredSegments) => {
+      // Build href using original segments up to this filtered segment
+      const originalIndex = segments.indexOf(segment);
+      const href = "/" + segments.slice(0, originalIndex + 1).join("/");
 
-    return {
-      href,
-      label,
-      isLast,
-    };
-  });
+      // Use custom label if available, otherwise convert segment to label
+      const label = customLabels[segment] || segmentToLabel(segment);
+      const isLast = index === filteredSegments.length - 1;
+
+      return {
+        href,
+        label,
+        isLast,
+      };
+    });
 
   return (
     <nav aria-label="Breadcrumb" className="py-3">

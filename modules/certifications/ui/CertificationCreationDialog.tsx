@@ -45,8 +45,8 @@ export function CertificationCreationDialog({
             onClick={() => handleModeSelect("pdf")}
           >
             <div className="flex flex-col items-center text-center space-y-4">
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <FileUp className="h-6 w-6 text-primary" />
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <FileUp className="h-8 w-8 text-primary" />
               </div>
               <div className="space-y-2">
                 <h3 className="font-semibold text-lg">Upload PDF</h3>
@@ -54,10 +54,6 @@ export function CertificationCreationDialog({
                   AI-powered extraction of certification details and exam blueprint
                 </p>
               </div>
-              <Button className="w-full">
-                <FileUp className="h-4 w-4 mr-2" />
-                Upload PDF
-              </Button>
             </div>
           </Card>
 
@@ -67,8 +63,8 @@ export function CertificationCreationDialog({
             onClick={() => handleModeSelect("manual")}
           >
             <div className="flex flex-col items-center text-center space-y-4">
-              <div className="h-12 w-12 rounded-full bg-secondary/10 flex items-center justify-center">
-                <Edit className="h-6 w-6 text-secondary-foreground" />
+              <div className="h-16 w-16 rounded-full bg-secondary/10 flex items-center justify-center">
+                <Edit className="h-8 w-8 text-secondary-foreground" />
               </div>
               <div className="space-y-2">
                 <h3 className="font-semibold text-lg">Manual Entry</h3>
@@ -76,10 +72,6 @@ export function CertificationCreationDialog({
                   Manually enter certification details and build blueprint later
                 </p>
               </div>
-              <Button variant="outline" className="w-full">
-                <Edit className="h-4 w-4 mr-2" />
-                Enter Manually
-              </Button>
             </div>
           </Card>
         </div>

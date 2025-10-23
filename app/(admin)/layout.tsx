@@ -6,7 +6,6 @@ const adminNavLinks = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/certifications", label: "Certifications" },
   { href: "/admin/users", label: "Users" },
-  { href: "/admin/settings", label: "Settings" },
 ];
 
 export default function AdminLayout({

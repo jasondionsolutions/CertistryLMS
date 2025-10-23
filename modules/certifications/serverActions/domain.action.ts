@@ -533,87 +533,168 @@ export const getDomains = withPermission("certifications.read")(
 /**
  * Bulk import domains from AI extraction
  * Deletes existing domains for the certification first
+ * Uses BULK inserts for maximum performance (8 queries instead of 855+)
  */
 export const bulkImportDomains = withPermission("certifications.update")(
   async (user: AuthContext, input: BulkImportDomainInput): Promise<BulkImportResponse> => {
     try {
       const validated = bulkImportDomainSchema.parse(input);
 
-      let domainsCreated = 0;
-      let objectivesCreated = 0;
-      let bulletsCreated = 0;
-      let subBulletsCreated = 0;
-
       // Delete existing domains (cascades to objectives, bullets, sub-bullets)
       await prisma.certificationDomain.deleteMany({
         where: { certificationId: validated.certificationId },
       });
 
-      // Import new domains
-      for (const domainData of validated.domains) {
-        const domain = await prisma.certificationDomain.create({
-          data: {
-            certificationId: validated.certificationId,
-            name: domainData.name,
-            weight: domainData.weight,
-            order: domainData.order,
-          },
-        });
-        domainsCreated++;
+      // Use bulk inserts in a transaction for massive performance improvement
+      const result = await prisma.$transaction(async (tx) => {
+        // Step 1: Bulk insert ALL domains
+        const domainsData = validated.domains.map((domainData) => ({
+          certificationId: validated.certificationId,
+          name: domainData.name,
+          weight: domainData.weight,
+          order: domainData.order,
+        }));
 
-        // Import objectives for this domain
-        for (const objectiveData of domainData.objectives) {
-          const objective = await prisma.certificationObjective.create({
-            data: {
-              domainId: domain.id,
+        await tx.certificationDomain.createMany({
+          data: domainsData,
+        });
+
+        // Step 2: Query back domains to get IDs (ordered by order field for matching)
+        const createdDomains = await tx.certificationDomain.findMany({
+          where: { certificationId: validated.certificationId },
+          orderBy: { order: 'asc' },
+          select: { id: true, order: true },
+        });
+
+        // Step 3: Bulk insert ALL objectives
+        const objectivesData: Array<{
+          domainId: string;
+          code: string;
+          description: string;
+          difficulty: string;
+          order: number;
+        }> = [];
+
+        validated.domains.forEach((domainData, domainIndex) => {
+          const domainId = createdDomains[domainIndex].id;
+          domainData.objectives.forEach((objectiveData) => {
+            objectivesData.push({
+              domainId,
               code: objectiveData.code,
               description: objectiveData.description,
               difficulty: objectiveData.difficulty,
               order: objectiveData.order,
-            },
+            });
           });
-          objectivesCreated++;
+        });
 
-          // Import bullets for this objective
-          if (objectiveData.bullets) {
-            for (const bulletData of objectiveData.bullets) {
-              const bullet = await prisma.bullet.create({
-                data: {
-                  objectiveId: objective.id,
-                  text: bulletData.text,
-                  order: bulletData.order,
-                },
-              });
-              bulletsCreated++;
-
-              // Import sub-bullets for this bullet
-              if (bulletData.subBullets) {
-                for (const subBulletData of bulletData.subBullets) {
-                  await prisma.subBullet.create({
-                    data: {
-                      bulletId: bullet.id,
-                      text: subBulletData.text,
-                      order: subBulletData.order,
-                    },
-                  });
-                  subBulletsCreated++;
-                }
-              }
-            }
-          }
+        if (objectivesData.length > 0) {
+          await tx.certificationObjective.createMany({
+            data: objectivesData,
+          });
         }
-      }
+
+        // Step 4: Query back objectives to get IDs
+        const createdObjectives = await tx.certificationObjective.findMany({
+          where: {
+            domainId: { in: createdDomains.map(d => d.id) },
+          },
+          orderBy: [{ domainId: 'asc' }, { order: 'asc' }],
+          select: { id: true, domainId: true, order: true },
+        });
+
+        // Step 5: Bulk insert ALL bullets
+        const bulletsData: Array<{
+          objectiveId: string;
+          text: string;
+          order: number;
+        }> = [];
+
+        let objectiveIndex = 0;
+        validated.domains.forEach((domainData) => {
+          domainData.objectives.forEach((objectiveData) => {
+            const objectiveId = createdObjectives[objectiveIndex].id;
+            objectiveData.bullets?.forEach((bulletData) => {
+              bulletsData.push({
+                objectiveId,
+                text: bulletData.text,
+                order: bulletData.order,
+              });
+            });
+            objectiveIndex++;
+          });
+        });
+
+        if (bulletsData.length > 0) {
+          await tx.bullet.createMany({
+            data: bulletsData,
+          });
+        }
+
+        // Step 6: Query back bullets to get IDs
+        const createdBullets = await tx.bullet.findMany({
+          where: {
+            objectiveId: { in: createdObjectives.map(o => o.id) },
+          },
+          orderBy: [{ objectiveId: 'asc' }, { order: 'asc' }],
+          select: { id: true, objectiveId: true, order: true },
+        });
+
+        // Step 7: Bulk insert ALL sub-bullets
+        const subBulletsData: Array<{
+          bulletId: string;
+          text: string;
+          order: number;
+        }> = [];
+
+        let bulletIndex = 0;
+        validated.domains.forEach((domainData) => {
+          domainData.objectives.forEach((objectiveData) => {
+            objectiveData.bullets?.forEach((bulletData) => {
+              const bulletId = createdBullets[bulletIndex].id;
+              bulletData.subBullets?.forEach((subBulletData) => {
+                subBulletsData.push({
+                  bulletId,
+                  text: subBulletData.text,
+                  order: subBulletData.order,
+                });
+              });
+              bulletIndex++;
+            });
+          });
+        });
+
+        if (subBulletsData.length > 0) {
+          await tx.subBullet.createMany({
+            data: subBulletsData,
+          });
+        }
+
+        // Count stats
+        const domainsCreated = domainsData.length;
+        const objectivesCreated = objectivesData.length;
+        const bulletsCreated = bulletsData.length;
+        const subBulletsCreated = subBulletsData.length;
+
+        console.error(
+          `Bulk imported ${domainsCreated} domains, ${objectivesCreated} objectives, ${bulletsCreated} bullets, ${subBulletsCreated} sub-bullets using BULK inserts`
+        );
+
+        return {
+          domainsCreated,
+          objectivesCreated,
+          bulletsCreated,
+          subBulletsCreated,
+        };
+      }, {
+        timeout: 30000, // 30 seconds timeout for large blueprints
+      });
 
       revalidatePath(`/admin/certifications/${validated.certificationId}/blueprint`);
 
       return {
         success: true,
-        data: {
-          domainsCreated,
-          objectivesCreated,
-          bulletsCreated,
-          subBulletsCreated,
-        },
+        data: result,
       };
     } catch (error) {
       console.error("Error bulk importing domains:", error);

@@ -187,15 +187,15 @@ export const checkCertificationDeletion = withPermission(
       }
 
       const hasStudents = certification._count.currentStudents > 0;
-      const hasContent = certification._count.domains > 0;
-      const canDelete = !hasStudents && !hasContent;
+      // Domains are part of blueprint structure, not a blocker for deletion
+      const canDelete = !hasStudents;
 
       return {
         success: true,
         data: {
           canDelete,
           hasStudents,
-          hasContent,
+          hasContent: false, // Domains are part of blueprint, not content
           studentCount: certification._count.currentStudents,
           domainCount: certification._count.domains,
         },

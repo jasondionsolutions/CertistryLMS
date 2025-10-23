@@ -6,13 +6,11 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { BlueprintManager } from "@/modules/certifications/ui/BlueprintManager";
 import { useCertifications } from "@/modules/certifications/hooks/useCertifications";
-import { useBreadcrumb } from "@/components/navigation/breadcrumb-context";
 
 export default function BlueprintPage() {
   const params = useParams();
   const router = useRouter();
   const certificationId = params.id as string;
-  const { setCustomLabel } = useBreadcrumb();
 
   // Fetch certification to get name
   const { data: certificationsResponse, isLoading } = useCertifications({
@@ -23,13 +21,6 @@ export default function BlueprintPage() {
   });
 
   const certification = certificationsResponse?.data?.find((cert) => cert.id === certificationId);
-
-  // Set custom breadcrumb label when certification data is available
-  React.useEffect(() => {
-    if (certification) {
-      setCustomLabel(certificationId, certification.name);
-    }
-  }, [certification, certificationId, setCustomLabel]);
 
   if (isLoading) {
     return (
@@ -73,8 +64,9 @@ export default function BlueprintPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{certification.name}</h1>
-          <p className="text-muted-foreground mt-1">{certification.code}</p>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {certification.name} ({certification.code})
+          </h1>
         </div>
       </div>
 

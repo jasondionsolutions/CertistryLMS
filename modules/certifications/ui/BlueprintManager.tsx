@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Edit, Save } from "lucide-react";
 import { DomainsEditor } from "./DomainsEditor";
 import { useDomains } from "../hooks/useDomains";
@@ -23,6 +24,9 @@ export function BlueprintManager({ certificationId, certificationName }: Bluepri
 
   // Local state for manual editing
   const [localDomains, setLocalDomains] = React.useState<any[]>([]);
+
+  // View/Edit mode state (default to view-only)
+  const [isEditMode, setIsEditMode] = React.useState(false);
 
   // Initialize local domains when data loads
   React.useEffect(() => {
@@ -76,11 +80,25 @@ export function BlueprintManager({ certificationId, certificationName }: Bluepri
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold">Blueprint Management</h2>
-        <p className="text-muted-foreground mt-1">
-          Manage exam domains, objectives, and learning outcomes
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Blueprint Management</h2>
+          <p className="text-muted-foreground mt-1">
+            Manage exam domains, objectives, and learning outcomes
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`text-sm font-medium ${!isEditMode ? "text-foreground" : "text-muted-foreground"}`}>
+            View Only
+          </span>
+          <Switch
+            checked={isEditMode}
+            onCheckedChange={setIsEditMode}
+          />
+          <span className={`text-sm font-medium ${isEditMode ? "text-foreground" : "text-muted-foreground"}`}>
+            Edit
+          </span>
+        </div>
       </div>
 
       {/* Blueprint Editor */}
@@ -94,12 +112,15 @@ export function BlueprintManager({ certificationId, certificationName }: Bluepri
             <p className="text-muted-foreground">
               No blueprint created yet. Create domains manually to get started.
             </p>
-            <Button onClick={() => setLocalDomains([{
-              name: "New Domain",
-              weight: 0,
-              order: 0,
-              objectives: [],
-            }])}>
+            <Button onClick={() => {
+              setLocalDomains([{
+                name: "New Domain",
+                weight: 0,
+                order: 0,
+                objectives: [],
+              }]);
+              setIsEditMode(true);
+            }}>
               <Edit className="h-4 w-4 mr-2" />
               Start Manual Creation
             </Button>
@@ -107,42 +128,39 @@ export function BlueprintManager({ certificationId, certificationName }: Bluepri
         </Card>
       ) : (
         <>
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">
-              Blueprint Editor
-            </h3>
-            <DomainsEditor
-              domains={localDomains}
-              onChange={setLocalDomains}
-              isEditable={true}
-            />
-          </Card>
+          <DomainsEditor
+            domains={localDomains}
+            onChange={setLocalDomains}
+            isEditable={isEditMode}
+          />
 
-          <div className="flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={() => {
-                // Reset to database state
-                const editorDomains = domains.map((domain) => ({
-                  ...domain,
-                  objectives: domain.objectives.map((objective) => ({
-                    ...objective,
-                    bullets: objective.bullets?.map((bullet) => ({
-                      ...bullet,
-                      subBullets: bullet.subBullets || [],
-                    })) || [],
-                  })),
-                }));
-                setLocalDomains(editorDomains);
-              }}
-            >
-              Reset Changes
-            </Button>
-            <Button onClick={handleSaveManual} disabled={!canSaveManual} size="lg">
-              <Save className="h-4 w-4 mr-2" />
-              {isSaving ? "Saving..." : "Save Blueprint"}
-            </Button>
-          </div>
+          {isEditMode && (
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // Reset to database state
+                  const editorDomains = domains.map((domain) => ({
+                    ...domain,
+                    objectives: domain.objectives.map((objective) => ({
+                      ...objective,
+                      bullets: objective.bullets?.map((bullet) => ({
+                        ...bullet,
+                        subBullets: bullet.subBullets || [],
+                      })) || [],
+                    })),
+                  }));
+                  setLocalDomains(editorDomains);
+                }}
+              >
+                Reset Changes
+              </Button>
+              <Button onClick={handleSaveManual} disabled={!canSaveManual} size="lg">
+                <Save className="h-4 w-4 mr-2" />
+                {isSaving ? "Saving..." : "Save Blueprint"}
+              </Button>
+            </div>
+          )}
         </>
       )}
     </div>

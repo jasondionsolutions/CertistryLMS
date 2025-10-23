@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { validateSession } from "@/lib/auth/validateSession";
 import Link from "next/link";
-import { BookOpen, Users, Settings as SettingsIcon, BarChart } from "lucide-react";
+import { BookOpen, Users, BarChart } from "lucide-react";
 
 /**
  * Admin Dashboard Page
@@ -39,14 +39,6 @@ export default async function AdminDashboardPage() {
       href: "/admin/users",
       color: "text-green-600 dark:text-green-400",
       bgColor: "bg-green-100 dark:bg-green-950",
-    },
-    {
-      title: "Settings",
-      description: "Configure system settings and preferences",
-      icon: SettingsIcon,
-      href: "/admin/settings",
-      color: "text-purple-600 dark:text-purple-400",
-      bgColor: "bg-purple-100 dark:bg-purple-950",
     },
   ];
 
@@ -115,26 +107,6 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* User Info */}
-      <div className="rounded-lg border bg-muted/50 p-6">
-        <h3 className="font-semibold mb-3">Your Account</h3>
-        <div className="grid gap-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Email:</span>
-            <span className="font-medium">{authContext.email}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Role:</span>
-            <span className="font-medium capitalize">
-              {authContext.roles.includes("admin") ? "Admin" : "Instructor"}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">User ID:</span>
-            <span className="font-mono text-xs">{authContext.userId}</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

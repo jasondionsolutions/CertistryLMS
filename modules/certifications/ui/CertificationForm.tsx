@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import {
   Dialog,
   DialogContent,
@@ -17,11 +17,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { AILoadingModal } from "@/components/ui/AILoadingModal";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { Trash, Archive, FileText } from "lucide-react";
 import { useCreateCertification } from "../hooks/useCreateCertification";
 import { useUpdateCertification } from "../hooks/useUpdateCertification";
 import { useCreateCertificationWithBlueprint } from "../hooks/useCreateCertificationWithBlueprint";
+import { useDeleteCertification } from "../hooks/useDeleteCertification";
+import { useArchiveCertification } from "../hooks/useArchiveCertification";
 import { createCertificationSchema, updateCertificationSchema } from "../types/certification.schema";
 
 interface CertificationFormProps {
@@ -37,10 +41,15 @@ interface CertificationFormProps {
     maxScore: number | null;
     defaultStudyDuration: number;
     isActive: boolean;
+    _count?: {
+      domains: number;
+      currentStudents: number;
+    };
   };
   blueprintData?: any[]; // Blueprint domains from AI extraction
   onSuccess?: () => void;
   mode?: "create" | "edit" | "review";
+  startInEditMode?: boolean; // Force the form to start in edit mode
 }
 
 export function CertificationForm({
@@ -50,13 +59,28 @@ export function CertificationForm({
   blueprintData,
   onSuccess,
   mode,
+  startInEditMode = false,
 }: CertificationFormProps) {
+  const router = useRouter();
   const isEditing = !!certification?.id;
   const isReview = mode === "review";
   const hasBlueprint = !!blueprintData && blueprintData.length > 0;
+  // Review mode is always editable, new certs start in edit mode, existing certs start in view mode (unless startInEditMode is true)
+  const [isEditMode, setIsEditMode] = React.useState(isReview || startInEditMode || !isEditing);
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = React.useState(false);
   const createCertification = useCreateCertification();
   const createWithBlueprint = useCreateCertificationWithBlueprint();
   const updateCertification = useUpdateCertification();
+  const deleteCertification = useDeleteCertification();
+  const archiveCertification = useArchiveCertification();
+
+  // Determine if we should show delete or archive button
+  // Only check for enrolled students - domains/objectives are part of initial blueprint
+  const studentCount = certification?._count?.currentStudents ?? 0;
+  const hasEnrolledStudents = studentCount > 0;
+  const showArchiveButton = hasEnrolledStudents;
+  const showDeleteButton = !hasEnrolledStudents;
 
   const {
     register,
@@ -84,8 +108,60 @@ export function CertificationForm({
   React.useEffect(() => {
     if (certification) {
       reset(certification);
+      // Review mode is always editable, otherwise use startInEditMode or default to view mode
+      setIsEditMode(isReview || startInEditMode);
+    } else {
+      setIsEditMode(true); // New cert starts in edit mode
     }
-  }, [certification, reset]);
+  }, [certification, reset, open, startInEditMode, isReview]);
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleArchiveClick = () => {
+    setShowArchiveConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!certification?.id) return;
+    const result = await deleteCertification.mutateAsync({ id: certification.id });
+    if (result.success) {
+      onOpenChange(false);
+      reset();
+      onSuccess?.();
+    }
+  };
+
+  const confirmArchive = async () => {
+    if (!certification?.id) return;
+    const result = await archiveCertification.mutateAsync({ id: certification.id, isArchived: true });
+    if (result.success) {
+      onOpenChange(false);
+      reset();
+      onSuccess?.();
+    }
+  };
+
+  const handleActiveToggle = async (checked: boolean) => {
+    setValue("isActive", checked);
+
+    // Auto-save if editing an existing certification
+    if (certification?.id) {
+      await updateCertification.mutateAsync({
+        id: certification.id,
+        name: certification.name,
+        code: certification.code,
+        description: certification.description ?? undefined,
+        isScoredExam: certification.isScoredExam,
+        passingScore: certification.passingScore ?? undefined,
+        maxScore: certification.maxScore ?? undefined,
+        defaultStudyDuration: certification.defaultStudyDuration,
+        isActive: checked,
+      });
+      onSuccess?.();
+    }
+  };
 
   const onSubmit = async (data: any) => {
     if (isEditing) {
@@ -177,14 +253,16 @@ export function CertificationForm({
             {isReview
               ? "Review Extracted Data"
               : isEditing
-              ? "Edit Certification"
+              ? "Certification Details"
               : "Create Certification"}
           </DialogTitle>
           <DialogDescription>
             {isReview
               ? "Review and edit the certification details extracted from the PDF."
               : isEditing
-              ? "Update the certification details below."
+              ? isEditMode
+                ? "Update the certification details below."
+                : "View certification details. Click Edit to make changes."
               : "Add a new certification program to the system."}
             {hasBlueprint && !isEditing && (
               <span className="block mt-1 text-primary font-medium">
@@ -203,6 +281,7 @@ export function CertificationForm({
             <Input
               id="name"
               placeholder="CompTIA Security+"
+              disabled={!isEditMode}
               {...register("name")}
             />
             {errors.name && (
@@ -218,6 +297,7 @@ export function CertificationForm({
             <Input
               id="code"
               placeholder="SY0-701"
+              disabled={!isEditMode}
               {...register("code")}
             />
             {errors.code && (
@@ -231,7 +311,8 @@ export function CertificationForm({
             <Textarea
               id="description"
               placeholder="Enter certification description..."
-              rows={3}
+              rows={6}
+              disabled={!isEditMode}
               {...register("description")}
             />
             {errors.description && (
@@ -239,16 +320,17 @@ export function CertificationForm({
             )}
           </div>
 
-          {/* Scored Exam Checkbox */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
+          {/* Scored Exam Switch */}
+          <div className="flex items-center gap-3">
+            <Label htmlFor="isScoredExam">
+              Scored Exam (Pass/Fail only if disabled)
+            </Label>
+            <Switch
               id="isScoredExam"
               checked={isScoredExam}
-              onCheckedChange={(checked) => setValue("isScoredExam", checked as boolean)}
+              onCheckedChange={(checked) => setValue("isScoredExam", checked)}
+              disabled={!isEditMode}
             />
-            <Label htmlFor="isScoredExam" className="cursor-pointer">
-              Scored Exam (uncheck for Pass/Fail only)
-            </Label>
           </div>
 
           {/* Scoring Fields (conditional) */}
@@ -262,6 +344,7 @@ export function CertificationForm({
                   id="passingScore"
                   type="number"
                   placeholder="750"
+                  disabled={!isEditMode}
                   {...register("passingScore", { valueAsNumber: true })}
                 />
                 {errors.passingScore && (
@@ -277,6 +360,7 @@ export function CertificationForm({
                   id="maxScore"
                   type="number"
                   placeholder="900"
+                  disabled={!isEditMode}
                   {...register("maxScore", { valueAsNumber: true })}
                 />
                 {errors.maxScore && (
@@ -294,7 +378,21 @@ export function CertificationForm({
             <RadioGroup
               value={watch("defaultStudyDuration")?.toString()}
               onValueChange={(value) => setValue("defaultStudyDuration", parseInt(value))}
+              disabled={!isEditMode}
+              className="flex flex-row gap-6"
             >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="7" id="duration-7" />
+                <Label htmlFor="duration-7" className="cursor-pointer font-normal">
+                  7 days
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="14" id="duration-14" />
+                <Label htmlFor="duration-14" className="cursor-pointer font-normal">
+                  14 days
+                </Label>
+              </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="30" id="duration-30" />
                 <Label htmlFor="duration-30" className="cursor-pointer font-normal">
@@ -319,36 +417,122 @@ export function CertificationForm({
             )}
           </div>
 
-          {/* Active Status */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="isActive"
-              checked={watch("isActive")}
-              onCheckedChange={(checked) => setValue("isActive", checked as boolean)}
-            />
-            <Label htmlFor="isActive" className="cursor-pointer">
-              Active (visible to students)
-            </Label>
+          {/* Active Status Toggle */}
+          <div className="flex items-center gap-3">
+            <Label htmlFor="isActive">Status:</Label>
+            <div className="flex items-center gap-2">
+              <span className={`text-sm ${!watch("isActive") ? "font-bold text-foreground" : "text-muted-foreground"}`}>
+                Inactive
+              </span>
+              <Switch
+                id="isActive"
+                checked={watch("isActive")}
+                onCheckedChange={handleActiveToggle}
+              />
+              <span className={`text-sm ${watch("isActive") ? "font-bold text-foreground" : "text-muted-foreground"}`}>
+                Active
+              </span>
+            </div>
           </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                onOpenChange(false);
-                reset();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : isEditing ? "Update" : "Create"}
-            </Button>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-between items-center w-full">
+            <div>
+              {isEditing && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (certification?.id) {
+                      router.push(`/admin/certifications/${certification.id}/blueprint`);
+                    }
+                  }}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Blueprint
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {isEditing && showDeleteButton && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleDeleteClick}
+                  disabled={deleteCertification.isPending}
+                >
+                  <Trash className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              )}
+              {isEditing && showArchiveButton && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleArchiveClick}
+                  disabled={archiveCertification.isPending}
+                >
+                  <Archive className="h-4 w-4 mr-2" />
+                  Archive
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  onOpenChange(false);
+                  reset();
+                  setIsEditMode(!isEditing);
+                }}
+              >
+                Cancel
+              </Button>
+              {isEditing && !isEditMode ? (
+                <Button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsEditMode(true);
+                  }}
+                >
+                  Edit
+                </Button>
+              ) : (
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Saving..." : isEditing ? "Save" : "Create"}
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Certification"
+        description={`You are about to permanently delete "${certification?.name} (${certification?.code})".\n\nThis action cannot be undone and will delete all blueprint data.`}
+        confirmText="Delete"
+        requireTypedConfirmation={true}
+        confirmationWord="Confirm"
+        onConfirm={confirmDelete}
+        variant="danger"
+      />
+
+      {/* Archive Confirmation Dialog */}
+      <ConfirmationDialog
+        open={showArchiveConfirm}
+        onOpenChange={setShowArchiveConfirm}
+        title="Archive Certification"
+        description={`You are about to archive "${certification?.name} (${certification?.code})".\n\nThis certification will be hidden from active students and cannot be re-assigned.`}
+        confirmText="Archive"
+        requireTypedConfirmation={true}
+        confirmationWord="Confirm"
+        onConfirm={confirmArchive}
+        variant="warning"
+      />
     </>
   );
 }

@@ -86,10 +86,11 @@ export const createCertificationWithBlueprint = withPermission("certifications.c
         };
       }
 
-      // Create certification with blueprint in a transaction
-      // Increase timeout for large blueprints (default is 5s, we need more for many domains/objectives)
+      // Create certification with blueprint using BULK inserts for performance
+      // Old approach: nested creates = 855+ sequential queries for large blueprints
+      // New approach: bulk createMany = ~8 queries total
       const result = await prisma.$transaction(async (tx) => {
-        // Create certification
+        // Step 1: Create certification
         const certification = await tx.certification.create({
           data: {
             name: validated.name,
@@ -104,76 +105,137 @@ export const createCertificationWithBlueprint = withPermission("certifications.c
           },
         });
 
-        let domainsCreated = 0;
-        let objectivesCreated = 0;
-        let bulletsCreated = 0;
-        let subBulletsCreated = 0;
+        // Step 2: Bulk insert ALL domains
+        const domainsData = validated.domains.map((domainData, domainIndex) => ({
+          certificationId: certification.id,
+          name: domainData.name,
+          weight: domainData.percentage ? domainData.percentage / 100 : 0,
+          order: domainIndex,
+        }));
 
-        // Import domains and objectives
-        for (let domainIndex = 0; domainIndex < validated.domains.length; domainIndex++) {
-          const domainData = validated.domains[domainIndex];
+        await tx.certificationDomain.createMany({
+          data: domainsData,
+        });
 
-          const domain = await tx.certificationDomain.create({
-            data: {
-              certificationId: certification.id,
-              name: domainData.name,
-              weight: domainData.percentage ? domainData.percentage / 100 : 0,
-              order: domainIndex,
-            },
-          });
-          domainsCreated++;
+        // Step 3: Query back domains to get IDs (ordered by order field for matching)
+        const createdDomains = await tx.certificationDomain.findMany({
+          where: { certificationId: certification.id },
+          orderBy: { order: 'asc' },
+          select: { id: true, order: true },
+        });
 
-          // Import objectives
-          for (let objIndex = 0; objIndex < domainData.objectives.length; objIndex++) {
-            const objectiveData = domainData.objectives[objIndex];
+        // Step 4: Bulk insert ALL objectives
+        const objectivesData: Array<{
+          domainId: string;
+          code: string;
+          description: string;
+          difficulty: string;
+          order: number;
+        }> = [];
 
-            const objective = await tx.certificationObjective.create({
-              data: {
-                domainId: domain.id,
-                code: objectiveData.objectiveNumber,
-                description: objectiveData.name,
-                difficulty: "intermediate", // Default difficulty
-                order: objIndex,
-              },
+        validated.domains.forEach((domainData, domainIndex) => {
+          const domainId = createdDomains[domainIndex].id;
+          domainData.objectives.forEach((objectiveData, objIndex) => {
+            objectivesData.push({
+              domainId,
+              code: objectiveData.objectiveNumber,
+              description: objectiveData.name,
+              difficulty: "intermediate",
+              order: objIndex,
             });
-            objectivesCreated++;
+          });
+        });
 
-            // Import bullets
-            if (objectiveData.bullets) {
-              for (let bulletIndex = 0; bulletIndex < objectiveData.bullets.length; bulletIndex++) {
-                const bulletData = objectiveData.bullets[bulletIndex];
-
-                const bullet = await tx.bullet.create({
-                  data: {
-                    objectiveId: objective.id,
-                    text: bulletData.text,
-                    order: bulletIndex,
-                  },
-                });
-                bulletsCreated++;
-
-                // Import sub-bullets
-                if (bulletData.subBullets) {
-                  for (let subIndex = 0; subIndex < bulletData.subBullets.length; subIndex++) {
-                    const subBulletData = bulletData.subBullets[subIndex];
-
-                    await tx.subBullet.create({
-                      data: {
-                        bulletId: bullet.id,
-                        text: subBulletData.text,
-                        order: subIndex,
-                      },
-                    });
-                    subBulletsCreated++;
-                  }
-                }
-              }
-            }
-          }
+        if (objectivesData.length > 0) {
+          await tx.certificationObjective.createMany({
+            data: objectivesData,
+          });
         }
 
+        // Step 5: Query back objectives to get IDs
+        const createdObjectives = await tx.certificationObjective.findMany({
+          where: {
+            domainId: { in: createdDomains.map(d => d.id) },
+          },
+          orderBy: [{ domainId: 'asc' }, { order: 'asc' }],
+          select: { id: true, domainId: true, order: true },
+        });
+
+        // Step 6: Bulk insert ALL bullets
+        const bulletsData: Array<{
+          objectiveId: string;
+          text: string;
+          order: number;
+        }> = [];
+
+        let objectiveIndex = 0;
+        validated.domains.forEach((domainData) => {
+          domainData.objectives.forEach((objectiveData) => {
+            const objectiveId = createdObjectives[objectiveIndex].id;
+            objectiveData.bullets?.forEach((bulletData, bulletIndex) => {
+              bulletsData.push({
+                objectiveId,
+                text: bulletData.text,
+                order: bulletIndex,
+              });
+            });
+            objectiveIndex++;
+          });
+        });
+
+        if (bulletsData.length > 0) {
+          await tx.bullet.createMany({
+            data: bulletsData,
+          });
+        }
+
+        // Step 7: Query back bullets to get IDs
+        const createdBullets = await tx.bullet.findMany({
+          where: {
+            objectiveId: { in: createdObjectives.map(o => o.id) },
+          },
+          orderBy: [{ objectiveId: 'asc' }, { order: 'asc' }],
+          select: { id: true, objectiveId: true, order: true },
+        });
+
+        // Step 8: Bulk insert ALL sub-bullets
+        const subBulletsData: Array<{
+          bulletId: string;
+          text: string;
+          order: number;
+        }> = [];
+
+        let bulletIndex = 0;
+        validated.domains.forEach((domainData) => {
+          domainData.objectives.forEach((objectiveData) => {
+            objectiveData.bullets?.forEach((bulletData) => {
+              const bulletId = createdBullets[bulletIndex].id;
+              bulletData.subBullets?.forEach((subBulletData, subIndex) => {
+                subBulletsData.push({
+                  bulletId,
+                  text: subBulletData.text,
+                  order: subIndex,
+                });
+              });
+              bulletIndex++;
+            });
+          });
+        });
+
+        if (subBulletsData.length > 0) {
+          await tx.subBullet.createMany({
+            data: subBulletsData,
+          });
+        }
+
+        // Count stats
+        const domainsCreated = domainsData.length;
+        const objectivesCreated = objectivesData.length;
+        const bulletsCreated = bulletsData.length;
+        const subBulletsCreated = subBulletsData.length;
+
         console.error(
-          `Created certification with ${domainsCreated} domains, ${objectivesCreated} objectives, ${bulletsCreated} bullets, ${subBulletsCreated} sub-bullets`
+          `Created certification with ${domainsCreated} domains, ${objectivesCreated} objectives, ${bulletsCreated} bullets, ${subBulletsCreated} sub-bullets using BULK inserts`
         );
 
         return {
@@ -186,7 +248,7 @@ export const createCertificationWithBlueprint = withPermission("certifications.c
           },
         };
       }, {
-        timeout: 120000, // 120 seconds (2 minutes) - increased for large blueprints like CompTIA Security+ with many objectives/bullets
+        timeout: 30000, // 30 seconds timeout (should complete much faster now)
       });
 
       revalidatePath("/admin/certifications");
