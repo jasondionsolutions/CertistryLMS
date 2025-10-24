@@ -14,6 +14,7 @@
     "test:unit:watch": "jest --watch",
     "test:unit:coverage": "jest --coverage",
     "test:all": "yarn test:unit && yarn test",
+    "postinstall": "prisma generate --schema=./schema/schema.prisma",
     "db:generate": "prisma generate --schema=./schema/schema.prisma",
     "db:push": "prisma db push --schema=./schema/schema.prisma",
     "db:studio": "prisma studio --schema=./schema/schema.prisma",
