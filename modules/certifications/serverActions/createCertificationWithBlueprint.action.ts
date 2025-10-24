@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { withPermission } from "@/lib/middleware/withPermission";
 import { AuthContext } from "@/lib/auth/types";
 import { z } from "zod";
@@ -89,7 +89,7 @@ export const createCertificationWithBlueprint = withPermission("certifications.c
       // Create certification with blueprint using BULK inserts for performance
       // Old approach: nested creates = 855+ sequential queries for large blueprints
       // New approach: bulk createMany = ~8 queries total
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         // Step 1: Create certification
         const certification = await tx.certification.create({
           data: {
