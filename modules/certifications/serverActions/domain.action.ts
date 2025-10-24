@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { withPermission } from "@/lib/middleware/withPermission";
 import { AuthContext } from "@/lib/auth/types";
 import {
@@ -546,7 +546,7 @@ export const bulkImportDomains = withPermission("certifications.update")(
       });
 
       // Use bulk inserts in a transaction for massive performance improvement
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         // Step 1: Bulk insert ALL domains
         const domainsData = validated.domains.map((domainData) => ({
           certificationId: validated.certificationId,
