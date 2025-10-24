@@ -1,9 +1,9 @@
 # Phase 2: Content Upload & Objective Mapping - Working Document
 
-**Last Updated**: 2025-10-23 (Issue #15 COMPLETED & CLOSED ✅)
-**Status**: Ready for Issue #16
-**Current Issue**: #16 - Video Transcription with Whisper API
-**Next Action**: Set up transcription worker and Whisper integration
+**Last Updated**: 2025-10-23 (Issue #16 COMPLETED & DEPLOYED ✅)
+**Status**: Issue #16 Complete - Ready for Issue #17
+**Current Issue**: #17 - TBD
+**Next Action**: Begin next issue in Phase 2
 **GitHub Milestone**: [Phase 2](https://github.com/jasondionsolutions/CertistryLMS/milestone/2)
 
 ---
@@ -25,8 +25,22 @@
   - Transcription & AI description checkboxes
   - Build passing ✅
 
+- **[Issue #16](https://github.com/jasondionsolutions/CertistryLMS/issues/16)**: Video Transcription with Whisper API ✅ **DEPLOYED**
+  - Whisper API integration with audio extraction (cost optimization)
+  - AI description generation (GPT-3.5-turbo, 100 words)
+  - BullMQ + Upstash Redis queue system
+  - Vercel cron worker (runs every 2 minutes)
+  - VTT closed captions format for video player
+  - Transcription status tracking (pending/processing/completed/failed/skipped)
+  - Manual transcript upload option (VTT format)
+  - Video chunking for large files (>25MB)
+  - Timeout protection and error handling
+  - VideoList component with transcription status badges
+  - Retry functionality for failed transcriptions
+  - Deployed to production ✅
+
 🚀 **Next**:
-- **[Issue #16](https://github.com/jasondionsolutions/CertistryLMS/issues/16)**: Video Transcription with Whisper API
+- **Issue #17**: TBD - Continue Phase 2
 
 ---
 
