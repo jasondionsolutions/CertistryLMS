@@ -13,10 +13,16 @@ import * as path from "path";
 import * as os from "os";
 import ffmpeg from "fluent-ffmpeg";
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialize OpenAI client to avoid build-time errors
+let openaiClient: OpenAI | null = null;
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openaiClient;
+}
 
 // Initialize S3 client
 const s3Client = new S3Client({
@@ -152,7 +158,7 @@ async function splitAudioIntoChunks(audioPath: string): Promise<string[]> {
 async function transcribeAudioChunk(audioPath: string): Promise<string> {
   const audioStream = fs.createReadStream(audioPath);
 
-  const transcription = await openai.audio.transcriptions.create({
+  const transcription = await getOpenAIClient().audio.transcriptions.create({
     file: audioStream,
     model: "whisper-1",
     response_format: "vtt", // Request VTT format with timestamps

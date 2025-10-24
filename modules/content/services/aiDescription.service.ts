@@ -6,10 +6,16 @@
 
 import OpenAI from "openai";
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialize OpenAI client to avoid build-time errors
+let openaiClient: OpenAI | null = null;
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openaiClient;
+}
 
 /**
  * Generate a concise description from video transcript
@@ -36,7 +42,7 @@ export async function generateVideoDescription(
         ? words.slice(0, maxTranscriptWords).join(" ") + "..."
         : transcript;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: "gpt-3.5-turbo", // Fast and cost-effective for descriptions
       messages: [
         {
