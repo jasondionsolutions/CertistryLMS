@@ -50,7 +50,7 @@ export async function GET(request: Request) {
 
           // Step 1: Transcribe video using Whisper
           console.error(`[Worker] Transcribing video ${videoId}...`);
-          const result = await transcribeVideo(s3Key, videoId);
+          const result = await transcribeVideo(videoId, s3Key);
 
           // Step 2: Generate AI description if requested
           let aiDescription: string | undefined;
