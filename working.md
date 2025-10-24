@@ -25,18 +25,27 @@
   - Transcription & AI description checkboxes
   - Build passing ✅
 
-- **[Issue #16](https://github.com/jasondionsolutions/CertistryLMS/issues/16)**: Video Transcription with Whisper API ✅ **DEPLOYED**
-  - Whisper API integration with audio extraction (cost optimization)
+- **[Issue #16](https://github.com/jasondionsolutions/CertistryLMS/issues/16)**: Video Transcription with Whisper API ✅ **WORKING IN PRODUCTION**
+  - Whisper API integration (sends video files directly, no audio extraction)
   - AI description generation (GPT-3.5-turbo, 100 words)
   - BullMQ + Upstash Redis queue system
   - Vercel cron worker (runs every 2 minutes)
   - VTT closed captions format for video player
   - Transcription status tracking (pending/processing/completed/failed/skipped)
   - Manual transcript upload option (VTT format)
-  - Video chunking for large files (>25MB)
   - Timeout protection and error handling
   - VideoList component with transcription status badges
   - Retry functionality for failed transcriptions
+  - Auto-refresh video list after upload
+  - **Deployment Fixes:**
+    - Removed ffmpeg dependency (not available in Vercel serverless)
+    - Fixed parameter order bug in worker (videoId vs s3Key)
+    - Increased worker timeout to 4 minutes (requires Vercel Pro)
+    - Fixed BullMQ Redis configuration
+  - **Current Limitations:**
+    - Max video file size: 25MB (Whisper API limit)
+    - Max transcription time: ~4 minutes (Vercel Pro function timeout)
+    - Videos >10-15 minutes may timeout and retry automatically
   - Deployed to production ✅
 
 🚀 **Next**:
@@ -337,6 +346,145 @@ Each issue MUST have:
 1. **Playwright E2E Tests**: UI interactions, CRUD operations, form submissions
 2. **Jest Component Tests**: Hooks, utilities, business logic
 3. **Test Coverage**: Success cases, error states, edge cases, validation
+
+---
+
+## Future Improvements: Long Video Support
+
+**Current Limitation:** Videos >10-15 minutes may timeout (Vercel Pro 5-minute function limit)
+
+### Problem
+- Whisper API processes in real-time (~1 minute per 1 minute of video)
+- 60-minute video = ~60 minutes of transcription time
+- 3-hour video = ~3 hours of transcription time
+- Vercel Pro max: 5 minutes (300 seconds)
+
+### Long-term Solutions (Prioritized)
+
+#### Option 1: Background Worker Service (RECOMMENDED)
+**Use a dedicated long-running worker outside Vercel:**
+- **AWS Lambda** (15-minute timeout) - $0.20 per 1M requests
+- **Railway** - Always-on workers, unlimited runtime
+- **Render** - Background workers with long timeouts
+- **Modal.com** - Serverless GPU workers (fast transcription)
+
+**Architecture:**
+```
+1. User uploads video → S3
+2. Vercel app adds job to queue (BullMQ/Upstash)
+3. External worker picks up job (polling or webhook)
+4. Worker transcribes (unlimited time)
+5. Worker updates Neon database when complete
+6. UI shows real-time status via polling
+```
+
+**Pros:**
+- ✅ Handles videos of any length (hours)
+- ✅ No Vercel timeout limitations
+- ✅ Can scale independently
+- ✅ Keep existing queue system
+
+**Cons:**
+- ❌ Additional service to manage
+- ❌ Small additional cost (~$5-10/month)
+
+**Implementation Complexity:** Medium (1-2 hours)
+
+---
+
+#### Option 2: Alternative Transcription API (EASIER)
+**Use Assembly AI or Deepgram** (async APIs with webhooks):
+
+**Assembly AI:**
+- Submit video URL → Get job ID instantly
+- Webhook callback when done (no timeout)
+- Supports files up to 5GB
+- $0.008/min (slightly more expensive than Whisper)
+
+**Deepgram:**
+- Similar async model
+- $0.0043/min (cheaper than Whisper!)
+- Supports streaming and batch
+
+**Architecture:**
+```
+1. User uploads video → S3
+2. Vercel submits S3 URL to Assembly AI
+3. Assembly AI calls webhook when done
+4. Webhook endpoint updates database
+5. No timeout issues!
+```
+
+**Pros:**
+- ✅ No timeout limitations
+- ✅ Built for async processing
+- ✅ Webhook-based (fire and forget)
+- ✅ Minimal code changes
+
+**Cons:**
+- ❌ Slightly more expensive (but not much)
+- ❌ Different API (need to rewrite whisper.service.ts)
+
+**Implementation Complexity:** Low (30 minutes)
+
+---
+
+#### Option 3: Video Chunking (COMPLEX)
+**Split long videos into smaller segments:**
+- Use ffmpeg to split video into 5-minute chunks
+- Transcribe each chunk separately
+- Combine transcripts with proper timestamps
+
+**Pros:**
+- ✅ Works within Vercel limits
+- ✅ Keep using Whisper API
+
+**Cons:**
+- ❌ Requires ffmpeg (not available in Vercel!)
+- ❌ Would need separate chunking service anyway
+- ❌ Complex timestamp alignment
+- ❌ More API calls = higher cost
+
+**Implementation Complexity:** High (4-6 hours)
+
+---
+
+#### Option 4: BullMQ Job Splitting (HACKY)
+**Let job timeout and resume:**
+- Configure BullMQ to retry on timeout
+- Each retry processes next segment
+- Track progress in job data
+
+**Pros:**
+- ✅ Minimal code changes
+- ✅ Use existing infrastructure
+
+**Cons:**
+- ❌ Very inefficient (many timeouts)
+- ❌ High cost (multiple Whisper API calls)
+- ❌ Poor UX (takes forever)
+- ❌ Not reliable
+
+**Implementation Complexity:** Low but not recommended
+
+---
+
+### Recommended Path Forward
+
+**For Now (MVP):**
+- ✅ Current solution works for videos <10-15 minutes
+- ✅ 80% of educational videos are <15 minutes
+- ✅ Manual transcript upload for longer videos
+
+**Phase 3 (After MVP):**
+- Implement **Option 1** (Background Worker Service)
+- Use Railway or AWS Lambda for unlimited processing time
+- Keep Vercel for web app, move heavy processing to workers
+
+**Phase 4 (Optional Optimization):**
+- Switch to **Option 2** (Assembly AI/Deepgram)
+- Better async model, built for this use case
+- Similar cost, better reliability
 
 ---
 
