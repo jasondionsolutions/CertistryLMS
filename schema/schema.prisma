@@ -127,7 +127,7 @@ model CertificationObjective {
   // Relationships
   bullets       Bullet[]
   videoMappings VideoObjectiveMapping[]
-  documents     Document[]
+  documentMappings DocumentObjectiveMapping[]
   questions     Question[]
   pbqs          PBQ[]
   progress      StudentProgress[]
@@ -180,12 +180,32 @@ model SubBullet {
 model Video {
   id          String @id @default(cuid())
   title       String
-  url         String // S3/CloudFront URL or external URL
+  videoCode   String? @map("video_code") // e.g., "SY7_01_01"
+  description String? @db.Text
+
+  // S3 Storage
+  s3Key       String  @unique @map("s3_key") // S3 object key
+  url         String // CloudFront/S3 public URL
+  thumbnailUrl String? @map("thumbnail_url") // Thumbnail URL (auto or custom)
+  thumbnailS3Key String? @map("thumbnail_s3_key") // Custom thumbnail S3 key
+
+  // Transcription
   transcript  String? @db.Text
+  transcriptionStatus String @default("pending") @map("transcription_status") // pending/processing/completed/failed/skipped
+  transcriptionError  String? @db.Text @map("transcription_error") // Error message if failed
+  aiDescriptionGenerated Boolean @default(false) @map("ai_description_generated") // Track if description was AI-generated
 
   // Metadata
   duration        Int? // Duration in seconds
+  fileSize        Int? @map("file_size") // File size in bytes
+  mimeType        String? @map("mime_type") // video/mp4, etc.
   difficultyLevel String @default("intermediate") @map("difficulty_level")
+
+  // Upload tracking
+  uploadedBy  String? @map("uploaded_by") // User ID who uploaded
+
+  // Student settings
+  allowDownload Boolean @default(true) @map("allow_download") // Can students download?
 
   // Content Status
   isProcessed Boolean @default(false) @map("is_processed") // Transcription complete
@@ -198,6 +218,9 @@ model Video {
   objectiveMappings VideoObjectiveMapping[]
   completions       VideoCompletion[]
 
+  @@index([s3Key])
+  @@index([uploadedBy])
+  @@index([transcriptionStatus])
   @@index([isActive])
   @@index([difficultyLevel])
   @@map("videos")
@@ -225,19 +248,55 @@ model VideoObjectiveMapping {
 model Document {
   id          String @id @default(cuid())
   title       String
-  url         String // S3 URL for PDF/document
-  type        String // "pdf", "markdown", "link"
+  description String? @db.Text
 
-  objectiveId String @map("objective_id")
-  objective   CertificationObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  // S3 Storage
+  s3Key       String  @unique @map("s3_key") // S3 object key
+  url         String // S3 URL for PDF/document
+  type        String // "pdf", "docx", "txt"
+
+  // Metadata
+  fileSize    Int? @map("file_size") // File size in bytes
+  mimeType    String? @map("mime_type") // application/pdf, etc.
+  version     Int @default(1) // Document versioning
+
+  // Upload tracking
+  uploadedBy  String? @map("uploaded_by") // User ID who uploaded
+
+  // Student settings
+  allowDownload Boolean @default(true) @map("allow_download") // Can students download?
 
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@index([objectiveId])
+  // Relationships
+  objectiveMappings DocumentObjectiveMapping[]
+
+  @@index([s3Key])
+  @@index([uploadedBy])
+  @@index([type])
   @@index([isActive])
   @@map("documents")
+}
+
+model DocumentObjectiveMapping {
+  id          String @id @default(cuid())
+  documentId  String @map("document_id")
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  objectiveId String @map("objective_id")
+  objective   CertificationObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+
+  // Mapping Metadata
+  isPrimary   Boolean @default(false) @map("is_primary") // Is this the main objective for this document?
+
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([documentId, objectiveId])
+  @@index([documentId])
+  @@index([objectiveId])
+  @@map("document_objective_mappings")
 }
 
 // =============================================================================
