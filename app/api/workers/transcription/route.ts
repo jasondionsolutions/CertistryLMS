@@ -126,8 +126,9 @@ export async function GET(request: Request) {
       console.error(`[Worker] Job ${job?.id} failed:`, err);
     });
 
-    // Process jobs for up to 50 seconds (leave 10 seconds buffer for Vercel's 60s timeout)
-    const timeout = 50000; // 50 seconds
+    // Process jobs for up to 4 minutes (leave 1 minute buffer for Vercel's 5 minute timeout on Pro plan)
+    // Note: Hobby plan has 60s limit - this requires Pro plan
+    const timeout = 240000; // 4 minutes (240 seconds)
 
     await new Promise<void>((resolve) => {
       const timer = setTimeout(async () => {
