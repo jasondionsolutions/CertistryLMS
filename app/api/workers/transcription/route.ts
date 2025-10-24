@@ -30,6 +30,29 @@ export async function GET(request: Request) {
 
     console.error("[Worker] Transcription worker triggered");
 
+    // Cleanup: Reset any videos stuck in "processing" (from previous worker crashes/timeouts)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const stuckVideos = await prisma.video.findMany({
+      where: {
+        transcriptionStatus: "processing",
+        updatedAt: { lt: fiveMinutesAgo },
+      },
+    });
+
+    if (stuckVideos.length > 0) {
+      console.error(`[Worker] Found ${stuckVideos.length} stuck videos, resetting to pending`);
+      await prisma.video.updateMany({
+        where: {
+          id: { in: stuckVideos.map((v) => v.id) },
+        },
+        data: {
+          transcriptionStatus: "pending",
+          transcriptionError: null,
+          isProcessed: false,
+        },
+      });
+    }
+
     // Create worker instance
     const worker = new Worker<TranscriptionJobData>(
       "video-transcription",
@@ -48,9 +71,13 @@ export async function GET(request: Request) {
             },
           });
 
-          // Step 1: Transcribe video using Whisper
+          // Step 1: Transcribe video using Whisper (with 3.5 minute timeout to leave buffer)
           console.error(`[Worker] Transcribing video ${videoId}...`);
-          const result = await transcribeVideo(videoId, s3Key);
+          const transcriptionPromise = transcribeVideo(videoId, s3Key);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Transcription timeout - video took too long to process")), 210000) // 3.5 minutes
+          );
+          const result = await Promise.race([transcriptionPromise, timeoutPromise]) as Awaited<ReturnType<typeof transcribeVideo>>;
 
           // Step 2: Generate AI description if requested
           let aiDescription: string | undefined;
@@ -132,9 +159,15 @@ export async function GET(request: Request) {
 
     await new Promise<void>((resolve) => {
       const timer = setTimeout(async () => {
-        console.error("[Worker] Timeout reached, closing worker");
-        await worker.close();
-        resolve();
+        console.error("[Worker] Timeout reached, pausing worker and waiting for active jobs to complete");
+        // Pause the worker to stop accepting new jobs
+        await worker.pause();
+        // Wait a moment for active job to finish (if any)
+        setTimeout(async () => {
+          console.error("[Worker] Closing worker after grace period");
+          await worker.close();
+          resolve();
+        }, 5000); // 5 second grace period for active job cleanup
       }, timeout);
 
       // Also listen for when worker becomes idle
