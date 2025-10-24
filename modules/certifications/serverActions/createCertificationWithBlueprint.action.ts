@@ -155,7 +155,7 @@ export const createCertificationWithBlueprint = withPermission("certifications.c
         // Step 5: Query back objectives to get IDs
         const createdObjectives = await tx.certificationObjective.findMany({
           where: {
-            domainId: { in: createdDomains.map(d => d.id) },
+            domainId: { in: createdDomains.map((d: { id: string }) => d.id) },
           },
           orderBy: [{ domainId: 'asc' }, { order: 'asc' }],
           select: { id: true, domainId: true, order: true },
@@ -192,7 +192,7 @@ export const createCertificationWithBlueprint = withPermission("certifications.c
         // Step 7: Query back bullets to get IDs
         const createdBullets = await tx.bullet.findMany({
           where: {
-            objectiveId: { in: createdObjectives.map(o => o.id) },
+            objectiveId: { in: createdObjectives.map((o: { id: string }) => o.id) },
           },
           orderBy: [{ objectiveId: 'asc' }, { order: 'asc' }],
           select: { id: true, objectiveId: true, order: true },
