@@ -14,6 +14,10 @@ export const redisConnection: ConnectionOptions = {
   url: process.env.UPSTASH_REDIS_URL,
   // Upstash requires TLS
   tls: process.env.UPSTASH_REDIS_URL?.includes('upstash') ? {} : undefined,
+  // Add connection timeouts to prevent hanging
+  connectTimeout: 5000, // 5 second connection timeout
+  commandTimeout: 5000, // 5 second command timeout
+  maxRetriesPerRequest: 1, // Only retry once to fail fast
 };
 
 /**

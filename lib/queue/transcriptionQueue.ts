@@ -39,15 +39,22 @@ export function getTranscriptionQueue(): Queue<TranscriptionJobData> {
 }
 
 /**
- * Add a video transcription job to the queue
+ * Add a video transcription job to the queue with timeout protection
  */
 export async function addTranscriptionJob(data: TranscriptionJobData) {
-  const queue = getTranscriptionQueue();
-
-  return await queue.add("transcribe-video", data, {
-    // Custom options per job
-    jobId: `transcribe-${data.videoId}`, // Prevents duplicate jobs for same video
-  });
+  // Wrap in timeout to prevent hanging (10 second limit)
+  return await Promise.race([
+    (async () => {
+      const queue = getTranscriptionQueue();
+      return await queue.add("transcribe-video", data, {
+        // Custom options per job
+        jobId: `transcribe-${data.videoId}`, // Prevents duplicate jobs for same video
+      });
+    })(),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Queue operation timed out after 10 seconds")), 10000)
+    ),
+  ]);
 }
 
 /**

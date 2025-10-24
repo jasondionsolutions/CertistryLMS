@@ -110,6 +110,7 @@ export const completeVideoUpload = withPermission("content.create")(
 
       // Queue transcription job only if enabled
       if (validated.enableTranscription) {
+        console.log("[completeVideoUpload] Attempting to queue transcription job for video:", video.id);
         try {
           await addTranscriptionJob({
             videoId: video.id,
@@ -117,6 +118,7 @@ export const completeVideoUpload = withPermission("content.create")(
             fileName: validated.title,
             generateDescription: validated.generateAiDescription,
           });
+          console.log("[completeVideoUpload] Successfully queued transcription job for video:", video.id);
         } catch (queueError) {
           // Log queue error but don't fail the upload
           console.error("[completeVideoUpload] Failed to queue transcription job:", queueError);
@@ -128,6 +130,7 @@ export const completeVideoUpload = withPermission("content.create")(
               transcriptionError: "Failed to queue transcription job. Please retry manually.",
             },
           });
+          console.log("[completeVideoUpload] Updated video status to failed for video:", video.id);
         }
       }
 
