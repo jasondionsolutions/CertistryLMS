@@ -221,14 +221,30 @@ export const retryTranscription = withPermission("content.update")(
         },
       });
 
-      // Re-queue transcription job
-      const { addTranscriptionJob } = await import("@/lib/queue/transcriptionQueue");
-      await addTranscriptionJob({
-        videoId: video.id,
-        s3Key: video.s3Key,
-        fileName: video.title,
-        generateDescription: false, // Don't regenerate description on retry
-      });
+      console.log("[retryTranscription] Attempting to re-queue job for video:", videoId);
+
+      // Re-queue transcription job with timeout protection
+      try {
+        const { addTranscriptionJob } = await import("@/lib/queue/transcriptionQueue");
+        await addTranscriptionJob({
+          videoId: video.id,
+          s3Key: video.s3Key,
+          fileName: video.title,
+          generateDescription: false, // Don't regenerate description on retry
+        });
+        console.log("[retryTranscription] Successfully queued job for video:", videoId);
+      } catch (queueError) {
+        // If queue fails, update status but don't fail the retry
+        console.error("[retryTranscription] Failed to queue job:", queueError);
+        await prisma.video.update({
+          where: { id: videoId },
+          data: {
+            transcriptionStatus: "failed",
+            transcriptionError: "Failed to queue retry. Please try again or check queue connection.",
+          },
+        });
+        throw new Error("Failed to queue transcription job. Please try again.");
+      }
 
       return {
         success: true,

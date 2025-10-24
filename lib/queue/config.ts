@@ -17,7 +17,7 @@ export const redisConnection: ConnectionOptions = {
   // Add connection timeouts to prevent hanging
   connectTimeout: 5000, // 5 second connection timeout
   commandTimeout: 5000, // 5 second command timeout
-  maxRetriesPerRequest: 1, // Only retry once to fail fast
+  maxRetriesPerRequest: null, // BullMQ requires this to be null
 };
 
 /**
