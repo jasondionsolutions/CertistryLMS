@@ -80,7 +80,12 @@ export function useUploadVideo(): UseUploadVideoResult {
         throw new Error(errorMsg);
       }
 
-      toast.success("Video uploaded successfully! Transcription is being processed.");
+      // Show appropriate success message based on transcription status
+      if (metadata.enableTranscription) {
+        toast.success("Video uploaded successfully! Transcription is being processed.");
+      } else {
+        toast.success("Video uploaded successfully!");
+      }
 
       setIsUploading(false);
       setProgress(null);

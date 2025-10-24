@@ -110,12 +110,25 @@ export const completeVideoUpload = withPermission("content.create")(
 
       // Queue transcription job only if enabled
       if (validated.enableTranscription) {
-        await addTranscriptionJob({
-          videoId: video.id,
-          s3Key: video.s3Key,
-          fileName: validated.title,
-          generateDescription: validated.generateAiDescription,
-        });
+        try {
+          await addTranscriptionJob({
+            videoId: video.id,
+            s3Key: video.s3Key,
+            fileName: validated.title,
+            generateDescription: validated.generateAiDescription,
+          });
+        } catch (queueError) {
+          // Log queue error but don't fail the upload
+          console.error("[completeVideoUpload] Failed to queue transcription job:", queueError);
+          // Update video status to indicate queue failure
+          await prisma.video.update({
+            where: { id: video.id },
+            data: {
+              transcriptionStatus: "failed",
+              transcriptionError: "Failed to queue transcription job. Please retry manually.",
+            },
+          });
+        }
       }
 
       return {
@@ -137,7 +150,7 @@ export const completeVideoUpload = withPermission("content.create")(
  */
 export const updateVideo = withPermission("content.update")(
   async (
-    user: AuthContext,
+    _user: AuthContext,
     input: UpdateVideoInput
   ): Promise<{ success: boolean; data?: { id: string }; error?: string }> => {
     try {
@@ -181,7 +194,7 @@ export const updateVideo = withPermission("content.update")(
  */
 export const deleteVideo = withPermission("content.delete")(
   async (
-    user: AuthContext,
+    _user: AuthContext,
     input: DeleteVideoInput
   ): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -225,7 +238,7 @@ export const deleteVideo = withPermission("content.delete")(
  */
 export const getVideo = withPermission("content.read")(
   async (
-    user: AuthContext,
+    _user: AuthContext,
     videoId: string
   ): Promise<{ success: boolean; data?: VideoWithRelations; error?: string }> => {
     try {
@@ -271,7 +284,7 @@ export const getVideo = withPermission("content.read")(
  */
 export const listVideos = withPermission("content.read")(
   async (
-    user: AuthContext,
+    _user: AuthContext,
     input: VideoQueryInput = { limit: 50, offset: 0 }
   ): Promise<{
     success: boolean;
