@@ -81,10 +81,14 @@ export function VideoList() {
                   )}
 
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>
-                      {(video.fileSize / 1024 / 1024).toFixed(1)} MB
-                    </span>
-                    <span>•</span>
+                    {video.fileSize && (
+                      <>
+                        <span>
+                          {(video.fileSize / 1024 / 1024).toFixed(1)} MB
+                        </span>
+                        <span>•</span>
+                      </>
+                    )}
                     <Badge variant="secondary" className="capitalize">
                       {video.difficultyLevel}
                     </Badge>
