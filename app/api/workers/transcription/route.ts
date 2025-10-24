@@ -13,6 +13,9 @@ import { transcribeVideo } from "@/modules/content/services/whisper.service";
 import { generateVideoDescription } from "@/modules/content/services/aiDescription.service";
 import { prisma } from "@/lib/prisma";
 
+// Set Vercel function timeout to 5 minutes (maximum for Pro plan)
+export const maxDuration = 300; // 5 minutes in seconds
+
 /**
  * GET handler - Process pending transcription jobs
  *
@@ -71,11 +74,11 @@ export async function GET(request: Request) {
             },
           });
 
-          // Step 1: Transcribe video using Whisper (with 3.5 minute timeout to leave buffer)
+          // Step 1: Transcribe video using Whisper (with 4 minute timeout to leave buffer)
           console.error(`[Worker] Transcribing video ${videoId}...`);
           const transcriptionPromise = transcribeVideo(videoId, s3Key);
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Transcription timeout - video took too long to process")), 210000) // 3.5 minutes
+            setTimeout(() => reject(new Error("Transcription timeout - video took too long to process")), 240000) // 4 minutes
           );
           const result = await Promise.race([transcriptionPromise, timeoutPromise]) as Awaited<ReturnType<typeof transcribeVideo>>;
 
@@ -153,9 +156,9 @@ export async function GET(request: Request) {
       console.error(`[Worker] Job ${job?.id} failed:`, err);
     });
 
-    // Process jobs for up to 4 minutes (leave 1 minute buffer for Vercel's 5 minute timeout on Pro plan)
+    // Process jobs for up to 4.5 minutes (leave 30s buffer for Vercel's 5 minute timeout on Pro plan)
     // Note: Hobby plan has 60s limit - this requires Pro plan
-    const timeout = 240000; // 4 minutes (240 seconds)
+    const timeout = 270000; // 4.5 minutes (270 seconds)
 
     await new Promise<void>((resolve) => {
       const timer = setTimeout(async () => {
