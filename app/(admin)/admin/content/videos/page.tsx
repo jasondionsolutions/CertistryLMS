@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { VideoList } from "@/modules/content/ui/VideoList";
 
 export const metadata = {
   title: "Videos | CertistryLMS Admin",
@@ -39,12 +40,7 @@ export default async function VideosPage() {
         )}
       </div>
 
-      {/* Video list will be added in Issue #19 (Content Library) */}
-      <div className="rounded-lg border p-12 text-center">
-        <p className="text-muted-foreground">
-          Video library coming soon. Use the &quot;Upload Video&quot; button to get started.
-        </p>
-      </div>
+      <VideoList />
     </div>
   );
 }
