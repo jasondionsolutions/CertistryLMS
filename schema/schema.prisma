@@ -195,6 +195,10 @@ model Video {
   transcriptionError  String? @db.Text @map("transcription_error") // Error message if failed
   aiDescriptionGenerated Boolean @default(false) @map("ai_description_generated") // Track if description was AI-generated
 
+  // Closed Captions (VTT format for video player)
+  captionsVttUrl    String? @map("captions_vtt_url")    // VTT file URL for CC
+  captionsVttS3Key  String? @map("captions_vtt_s3_key") // VTT file S3 key
+
   // Metadata
   duration        Int? // Duration in seconds
   fileSize        Int? @map("file_size") // File size in bytes

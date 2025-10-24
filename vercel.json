@@ -4,6 +4,12 @@
   "devCommand": "yarn dev",
   "installCommand": "yarn install",
   "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/workers/transcription",
+      "schedule": "*/2 * * * *"
+    }
+  ],
   "git": {
     "deploymentEnabled": {
       "main": true,

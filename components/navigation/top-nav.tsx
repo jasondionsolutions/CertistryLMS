@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Menu, X, ChevronDown, LogOut, Home, Award, Users, Settings } from "lucide-react";
 import { useState } from "react";
@@ -51,7 +50,6 @@ function getInitials(name?: string, email?: string): string {
  */
 export function TopNav({ navLinks }: TopNavProps) {
   const { user, email, roles, isAdmin, isLoading } = useAuth();
-  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const userInitials = getInitials(user?.name, email || undefined);
