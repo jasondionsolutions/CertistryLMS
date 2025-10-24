@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +32,7 @@ import { Upload, X } from "lucide-react";
 
 export function VideoUploadForm() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { uploadVideo, isUploading, progress } = useUploadVideo();
 
   const [file, setFile] = useState<File | null>(null);
@@ -153,6 +155,9 @@ export function VideoUploadForm() {
         setAllowDownload(false);
         setEnableTranscription(true);
         setGenerateAiDescription(true);
+
+        // Invalidate videos query to force refresh on video list page
+        queryClient.invalidateQueries({ queryKey: ["videos"] });
 
         // Redirect to video list or management page
         router.push("/admin/content/videos");
