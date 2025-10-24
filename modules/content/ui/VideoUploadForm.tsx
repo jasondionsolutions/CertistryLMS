@@ -132,29 +132,35 @@ export function VideoUploadForm() {
       return;
     }
 
-    const result = await uploadVideo(file, {
-      title: title.trim(),
-      videoCode: videoCode.trim() || undefined,
-      description: description.trim() || undefined,
-      difficultyLevel,
-      allowDownload,
-      enableTranscription,
-      generateAiDescription,
-    });
+    try {
+      const result = await uploadVideo(file, {
+        title: title.trim(),
+        videoCode: videoCode.trim() || undefined,
+        description: description.trim() || undefined,
+        difficultyLevel,
+        allowDownload,
+        enableTranscription,
+        generateAiDescription,
+      });
 
-    if (result.success) {
-      // Reset form
-      setFile(null);
-      setTitle("");
-      setVideoCode("");
-      setDescription("");
-      setDifficultyLevel("intermediate");
-      setAllowDownload(false);
-      setEnableTranscription(true);
-      setGenerateAiDescription(true);
+      if (result.success) {
+        // Reset form
+        setFile(null);
+        setTitle("");
+        setVideoCode("");
+        setDescription("");
+        setDifficultyLevel("intermediate");
+        setAllowDownload(false);
+        setEnableTranscription(true);
+        setGenerateAiDescription(true);
 
-      // Redirect to video list or management page
-      router.push("/admin/content/videos");
+        // Redirect to video list or management page
+        router.push("/admin/content/videos");
+      }
+      // If result.success is false, error is already shown by toast in the hook
+    } catch (error) {
+      // Additional error handling in case of unexpected errors
+      console.error("[VideoUploadForm] Unexpected error:", error);
     }
   };
 

@@ -59,6 +59,12 @@ export function useUploadVideo(): UseUploadVideoResult {
       });
 
       // Step 3: Complete upload by saving metadata
+      console.log("[Upload] Completing upload with metadata:", {
+        s3Key,
+        title: metadata.title,
+        fileSize: file.size,
+      });
+
       const completeResult = await completeVideoUpload({
         ...metadata,
         s3Key,
@@ -66,8 +72,12 @@ export function useUploadVideo(): UseUploadVideoResult {
         mimeType: file.type as any, // Type validated by form before upload
       });
 
+      console.log("[Upload] Complete result:", completeResult);
+
       if (!completeResult.success || !completeResult.data) {
-        throw new Error(completeResult.error || "Failed to save video");
+        const errorMsg = completeResult.error || "Failed to save video";
+        console.error("[Upload] Complete upload failed:", errorMsg);
+        throw new Error(errorMsg);
       }
 
       toast.success("Video uploaded successfully! Transcription is being processed.");
