@@ -131,9 +131,9 @@ export async function validateSession(): Promise<AuthContext> {
 
   // Map roles to permissions
   const permissions = new Set<string>();
-  user.roles.forEach((role) => {
+  user.roles.forEach((role: string) => {
     const rolePermissions = ROLE_PERMISSIONS[role] || [];
-    rolePermissions.forEach((perm) => permissions.add(perm));
+    rolePermissions.forEach((perm: string) => permissions.add(perm));
   });
 
   // Build and return AuthContext
