@@ -90,21 +90,21 @@ export function VideoUploadForm() {
     if (!title || !videoCode) {
       const fileName = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
 
-      // Try to extract video code pattern (e.g., SY7_01_01)
-      // Pattern: [LETTERS][NUMBERS]_[NUMBERS]_[NUMBERS]
-      const codeMatch = fileName.match(/^([A-Z]+\d+_\d+_\d+)_/i);
+      // Try to extract video code pattern (e.g., SY7_01_01 or AISF1_07_07)
+      // Pattern: [LETTERS][NUMBERS]_[NUMBERS]_[NUMBERS] followed by space or underscore
+      const codeMatch = fileName.match(/^([A-Z]+\d+_\d+_\d+)[_ ]/i);
 
       if (codeMatch) {
         // Extract code and title
         const extractedCode = codeMatch[1];
-        const remainingTitle = fileName.substring(extractedCode.length + 1); // +1 for the underscore
+        const remainingTitle = fileName.substring(extractedCode.length + 1); // +1 for the separator (space or underscore)
 
         if (!videoCode) {
-          setVideoCode(extractedCode.toUpperCase()); // e.g., "SY7_01_01"
+          setVideoCode(extractedCode.toUpperCase()); // e.g., "SY7_01_01" or "AISF1_07_07"
         }
         if (!title) {
-          // Convert underscores to spaces
-          setTitle(remainingTitle.replace(/_/g, " ")); // e.g., "Introduction to Security+"
+          // Convert underscores to spaces and trim
+          setTitle(remainingTitle.replace(/_/g, " ").trim()); // e.g., "Introduction to Security+" or "Risk Measurement"
         }
       } else {
         // No code pattern found, just use the whole filename as title
