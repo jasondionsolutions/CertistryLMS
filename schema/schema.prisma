@@ -62,6 +62,9 @@ model Certification {
   code        String   // e.g., "SY0-701"
   description String?  @db.Text
 
+  // Video Code Pattern (for auto-detection)
+  videoCodePrefix String? @map("video_code_prefix") // e.g., "AISF", "SY7" - videos with codes starting with this will auto-link
+
   // Exam Configuration
   blueprint    Json?    // Uploaded exam blueprint structure
 
@@ -84,6 +87,7 @@ model Certification {
   diagnostics StudentDiagnostic[]
   learningPaths StudentLearningPath[]
   currentStudents User[] @relation("CurrentCertification")
+  videos     Video[] // Videos associated with this certification
 
   @@index([isActive])
   @@index([isArchived])
@@ -200,7 +204,7 @@ model SubBullet {
 model Video {
   id          String @id @default(cuid())
   title       String
-  videoCode   String? @map("video_code") // e.g., "SY7_01_01"
+  videoCode   String? @map("video_code") // e.g., "AISF1", "SY7_01_01"
   description String? @db.Text
 
   // S3 Storage
@@ -225,6 +229,10 @@ model Video {
   mimeType        String? @map("mime_type") // video/mp4, etc.
   difficultyLevel String @default("intermediate") @map("difficulty_level")
 
+  // Certification association (optional - can be derived from videoCode)
+  certificationId String? @map("certification_id")
+  certification   Certification? @relation(fields: [certificationId], references: [id], onDelete: SetNull)
+
   // Upload tracking
   uploadedBy  String? @map("uploaded_by") // User ID who uploaded
 
@@ -241,6 +249,8 @@ model Video {
   // Relationships
   contentMappings VideoContentMapping[]
   completions     VideoCompletion[]
+
+  @@index([certificationId])
 
   @@index([s3Key])
   @@index([uploadedBy])

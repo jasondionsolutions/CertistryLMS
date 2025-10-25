@@ -10,12 +10,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { validateSession } from "@/lib/auth/validateSession";
 import { getVideo } from "@/modules/content/serverActions/video.action";
+import { detectCertificationFromVideoCode } from "@/modules/content/lib/detectCertificationFromVideoCode";
 import { VideoMappingClient } from "./VideoMappingClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Video } from "lucide-react";
+import { ArrowLeft, Video, AlertCircle } from "lucide-react";
 
 interface PageProps {
   params: Promise<{
@@ -39,9 +40,56 @@ export default async function VideoObjectiveMappingPage({ params }: PageProps) {
 
   const video = videoResult.data;
 
-  // For now, hardcode certification ID - in production, this would come from user context or video metadata
-  // TODO: Get certification ID from video metadata or user's current certification
-  const certificationId = "cm6faj8fu0000m3rj9iuv02a4"; // Placeholder
+  // Detect certification from video's certificationId or videoCode
+  let certificationId = video.certificationId;
+  let certificationName: string | undefined;
+  let detectedFromCode = false;
+
+  if (!certificationId && video.videoCode) {
+    // Try to detect from video code
+    const detected = await detectCertificationFromVideoCode(video.videoCode);
+    if (detected) {
+      certificationId = detected.id;
+      certificationName = detected.name;
+      detectedFromCode = true;
+    }
+  }
+
+  // If we still don't have a certification, show error
+  if (!certificationId) {
+    return (
+      <div className="container max-w-6xl py-8">
+        <div className="mb-6 flex items-center gap-4">
+          <Link href="/admin/content/videos">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold">Map Video to Objectives</h1>
+          </div>
+        </div>
+
+        <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-yellow-900 dark:text-yellow-100">
+              <AlertCircle className="h-5 w-5" />
+              Certification Required
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-yellow-800 dark:text-yellow-200">
+            <p className="mb-4">
+              This video is not linked to a certification. Please assign a
+              certification to this video before mapping it to objectives.
+            </p>
+            <p className="text-sm">
+              Video Code: <code className="font-mono">{video.videoCode || "Not set"}</code>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-6xl py-8">
@@ -58,6 +106,11 @@ export default async function VideoObjectiveMappingPage({ params }: PageProps) {
             <p className="text-sm text-muted-foreground">
               Link this video to relevant exam content
             </p>
+            {detectedFromCode && certificationName && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Detected certification: <span className="font-medium">{certificationName}</span>
+              </p>
+            )}
           </div>
         </div>
       </div>

@@ -169,6 +169,7 @@ export interface VideoWithRelations {
   fileSize: number | null;
   mimeType: string | null;
   difficultyLevel: DifficultyLevel;
+  certificationId: string | null;
   uploadedBy: string | null;
   allowDownload: boolean;
   isProcessed: boolean;
