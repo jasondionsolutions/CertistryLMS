@@ -45,6 +45,7 @@ interface CertificationFormProps {
     name: string;
     code: string;
     description: string | null;
+    videoCodePrefix?: string | null;
     isScoredExam: boolean;
     passingScore: number | null;
     maxScore: number | null;
@@ -349,20 +350,40 @@ export function CertificationForm({
             )}
           </div>
 
-          {/* Certification Code */}
-          <div className="space-y-2">
-            <Label htmlFor="code">
-              Certification Code <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="code"
-              placeholder="SY0-701"
-              disabled={!isEditMode}
-              {...register("code")}
-            />
-            {errors.code && (
-              <p className="text-sm text-destructive">{errors.code.message as string}</p>
-            )}
+          {/* Certification Code & Video Code Prefix (Two Columns) */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="code">
+                Certification Code <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="code"
+                placeholder="SY0-701"
+                disabled={!isEditMode}
+                {...register("code")}
+              />
+              {errors.code && (
+                <p className="text-sm text-destructive">{errors.code.message as string}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="videoCodePrefix">
+                Video Code Prefix
+              </Label>
+              <Input
+                id="videoCodePrefix"
+                placeholder="SY7"
+                disabled={!isEditMode}
+                {...register("videoCodePrefix")}
+              />
+              <p className="text-xs text-muted-foreground">
+                Videos with codes starting with this will auto-link
+              </p>
+              {errors.videoCodePrefix && (
+                <p className="text-sm text-destructive">{errors.videoCodePrefix.message as string}</p>
+              )}
+            </div>
           </div>
 
           {/* Description */}

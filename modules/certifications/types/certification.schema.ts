@@ -7,6 +7,7 @@ export const createCertificationSchema = z.object({
   name: z.string().min(1, "Certification name is required").trim(),
   code: z.string().min(1, "Certification code is required").trim(),
   description: z.string().optional(),
+  videoCodePrefix: z.string().optional(), // Optional prefix for auto-linking videos
 
   // Scoring configuration
   isScoredExam: z.boolean().default(true),
@@ -52,6 +53,7 @@ export const updateCertificationSchema = z.object({
   name: z.string().min(1, "Certification name is required").trim(),
   code: z.string().min(1, "Certification code is required").trim(),
   description: z.string().optional(),
+  videoCodePrefix: z.string().optional(), // Optional prefix for auto-linking videos
 
   // Scoring configuration
   isScoredExam: z.boolean(),
