@@ -5,6 +5,7 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import { withPermission } from "@/lib/middleware/withPermission";
 import { AuthContext } from "@/lib/auth/types";
 import { z } from "zod";
+import { generateCertificationEmbeddings } from "@/modules/content/services/generateCertificationEmbeddings.service";
 
 const prisma = new PrismaClient();
 
@@ -264,6 +265,16 @@ export const createCertificationWithBlueprint = withPermission("certifications.c
         });
         console.error(`Domain weights invalid (${totalPercentage}%). Certification forced to inactive.`);
       }
+
+      // Trigger embedding generation asynchronously (fire-and-forget)
+      // This allows AI-powered content mapping to work without blocking the response
+      void generateCertificationEmbeddings(result.certification.id).then((embeddingResult) => {
+        if (embeddingResult.success) {
+          console.error(`[Embeddings] ✅ Generated embeddings for certification ${result.certification.id}:`, embeddingResult.stats);
+        } else {
+          console.error(`[Embeddings] ❌ Failed to generate embeddings for certification ${result.certification.id}:`, embeddingResult.error);
+        }
+      });
 
       revalidatePath("/admin/certifications");
       revalidatePath(`/admin/certifications/${result.certification.id}/blueprint`);

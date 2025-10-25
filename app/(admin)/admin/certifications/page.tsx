@@ -21,6 +21,7 @@ import { CertificationForm } from "@/modules/certifications/ui/CertificationForm
 import { CertificationCreationDialog } from "@/modules/certifications/ui/CertificationCreationDialog";
 import { CertificationPDFUploadForm } from "@/modules/certifications/ui/CertificationPDFUploadForm";
 import { DomainWeightChart } from "@/modules/certifications/ui/DomainWeightChart";
+import { EmbeddingStatusBadge } from "@/modules/content/ui/EmbeddingStatusBadge";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -409,7 +410,7 @@ export default function CertificationsPage() {
                 selectedIds.includes(cert.id) ? "ring-2 ring-primary" : ""
               }`}
             >
-              {/* Badge in bottom left corner */}
+              {/* Status badge in bottom left corner */}
               <div className="absolute bottom-3 left-3 z-10">
                 {cert.isActive && !cert.isArchived && (
                   <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
@@ -426,6 +427,11 @@ export default function CertificationsPage() {
                     Archived
                   </span>
                 )}
+              </div>
+
+              {/* AI Mapping badge in bottom right corner */}
+              <div className="absolute bottom-3 right-3 z-10">
+                <EmbeddingStatusBadge certificationId={cert.id} />
               </div>
 
               {/* Clickable card area */}
