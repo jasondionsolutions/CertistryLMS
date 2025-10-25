@@ -7,6 +7,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { listVideos } from "../serverActions/video.action";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,8 @@ import { TranscriptionStatus } from "./TranscriptionStatus";
 import { Loader2 } from "lucide-react";
 
 export function VideoList() {
+  const router = useRouter();
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["videos"],
     queryFn: async () => {
@@ -61,7 +64,11 @@ export function VideoList() {
 
       <div className="grid gap-4">
         {data.videos.map((video) => (
-          <Card key={video.id}>
+          <Card
+            key={video.id}
+            className="cursor-pointer transition-colors hover:bg-accent/50"
+            onClick={() => router.push(`/admin/content/videos/${video.id}/map-objectives`)}
+          >
             <CardContent className="p-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
