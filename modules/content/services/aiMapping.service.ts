@@ -130,8 +130,7 @@ export async function suggestMappingsForVideo(
       if (confidence >= CONFIDENCE_THRESHOLD) {
         suggestions.push({
           subBulletId: subBullet.id,
-          bulletId: bullet.id,
-          objectiveId: bullet.objective.id,
+          // Only populate subBulletId, not bulletId or objectiveId (most specific level)
           domain: {
             id: bullet.objective.domain.id,
             name: bullet.objective.domain.name,
@@ -162,7 +161,7 @@ export async function suggestMappingsForVideo(
 
     // Skip if we already have a sub-bullet from this bullet
     const hasSubBulletSuggestion = suggestions.some(
-      (s) => s.bulletId === bullet.id && s.subBulletId
+      (s) => s.bullet?.id === bullet.id && s.subBulletId
     );
     if (hasSubBulletSuggestion) continue;
 
@@ -172,7 +171,7 @@ export async function suggestMappingsForVideo(
     if (confidence >= CONFIDENCE_THRESHOLD) {
       suggestions.push({
         bulletId: bullet.id,
-        objectiveId: bullet.objective.id,
+        // Only populate bulletId, not objectiveId (most specific level)
         domain: {
           id: bullet.objective.domain.id,
           name: bullet.objective.domain.name,
@@ -198,7 +197,7 @@ export async function suggestMappingsForVideo(
 
     // Skip if we already have a bullet/sub-bullet from this objective
     const hasChildSuggestion = suggestions.some(
-      (s) => s.objectiveId === objective.id
+      (s) => s.objective?.id === objective.id && (s.bulletId || s.subBulletId)
     );
     if (hasChildSuggestion) continue;
 
