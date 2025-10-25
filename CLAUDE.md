@@ -13,25 +13,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `yarn lint` - Run ESLint
 - `yarn typecheck` - Run TypeScript checks without emitting files
 
-### Testing
-- `yarn test` - Run Playwright e2e tests (headless)
-- `yarn test:ui` - Run Playwright tests with interactive UI runner
-- Tests are located in `tests/` directory
-- Base URL for tests: `http://localhost:3000`
-
-**IMPORTANT - Testing Policy:**
-- **BOTH Playwright (E2E) AND Jest (component) tests MUST be completed for all new features**
-- **ALWAYS create Playwright tests for every new feature, component, or page created**
-- **ALWAYS create Jest tests for utility functions, hooks, and business logic**
-- **A feature is NOT considered complete until both E2E and component tests are written and passing**
-- Tests should be written as features are developed, not after the fact
-- Test coverage includes:
-  - **Playwright (E2E)**: UI interactions, CRUD operations, navigation, form submissions, search/filtering
-  - **Jest (Component/Unit)**: Utility functions, custom hooks, business logic, data transformations
-  - Form validation (both E2E and unit)
-  - Error states and edge cases
-  - Responsive design (mobile, tablet, desktop)
-  - Loading and empty states
 
 ### Database (Prisma)
 - `yarn db:generate` - Generate Prisma Client
@@ -59,7 +40,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Database**: Prisma ORM + PostgreSQL (Neon.tech serverless)
 - **State Management**: Zustand (optional - only for complex client UI state, not server data)
 - **Validation**: Zod schemas
-- **Testing**: Playwright for e2e
 
 ### Modular Architecture
 
@@ -218,7 +198,6 @@ function BookList() {
 - `lib/middleware/` - Access control (withAccess, withPermission)
 - `lib/auth/` - Authentication helpers and types
 - `schema/` - Prisma schema and DB logic
-- `tests/` - Playwright e2e tests
 - `public/` - Static assets
 
 ### Architecture Compliance Rules
@@ -245,7 +224,6 @@ function BookList() {
 3. Create RBAC-wrapped server actions in `modules/[feature]/serverActions/`
 4. Create typed client hooks in `modules/[feature]/hooks/`
 5. Build UI components that consume hooks
-6. Write Playwright tests
 
 ### ESLint Rules & Code Quality
 

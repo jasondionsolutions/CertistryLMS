@@ -248,13 +248,43 @@ export const getVideo = withPermission("content.read")(
       const video = await prisma.video.findUnique({
         where: { id: videoId },
         include: {
-          objectiveMappings: {
+          contentMappings: {
             include: {
               objective: {
                 include: {
                   domain: {
                     select: {
                       name: true,
+                    },
+                  },
+                },
+              },
+              bullet: {
+                include: {
+                  objective: {
+                    include: {
+                      domain: {
+                        select: {
+                          name: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              subBullet: {
+                include: {
+                  bullet: {
+                    include: {
+                      objective: {
+                        include: {
+                          domain: {
+                            select: {
+                              name: true,
+                            },
+                          },
+                        },
+                      },
                     },
                   },
                 },
@@ -328,13 +358,43 @@ export const listVideos = withPermission("content.read")(
       const videos = await prisma.video.findMany({
         where,
         include: {
-          objectiveMappings: {
+          contentMappings: {
             include: {
               objective: {
                 include: {
                   domain: {
                     select: {
                       name: true,
+                    },
+                  },
+                },
+              },
+              bullet: {
+                include: {
+                  objective: {
+                    include: {
+                      domain: {
+                        select: {
+                          name: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              subBullet: {
+                include: {
+                  bullet: {
+                    include: {
+                      objective: {
+                        include: {
+                          domain: {
+                            select: {
+                              name: true,
+                            },
+                          },
+                        },
+                      },
                     },
                   },
                 },

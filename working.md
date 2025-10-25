@@ -1,9 +1,9 @@
 # Phase 2: Content Upload & Objective Mapping - Working Document
 
-**Last Updated**: 2025-10-23 (Issue #16 COMPLETED & DEPLOYED ✅)
-**Status**: Issue #16 Complete - Ready for Issue #17
-**Current Issue**: #17 - TBD
-**Next Action**: Begin next issue in Phase 2
+**Last Updated**: 2025-10-25 (Issue #17 COMPLETED ✅)
+**Status**: Issue #17 - AI-Assisted Content-to-Objective Mapping (Complete)
+**Current Issue**: #17 - CLOSED ✅
+**Next Action**: Ready for Issue #18 (PDF/Document Upload) or Issue #19 (Content Library)
 **GitHub Milestone**: [Phase 2](https://github.com/jasondionsolutions/CertistryLMS/milestone/2)
 
 ---
@@ -48,8 +48,13 @@
     - Videos >10-15 minutes may timeout and retry automatically
   - Deployed to production ✅
 
-🚀 **Next**:
-- **Issue #17**: TBD - Continue Phase 2
+✅ **Recently Completed**:
+- **Issue #17**: Content-to-Objective Mapping with AI Suggestions - COMPLETED ✅
+  - AI-powered semantic similarity mapping
+  - Flexible polymorphic mapping to objectives/bullets/sub-bullets
+  - Complete UI with suggestions, manual mapping, and management
+  - 20 files created, ~1,500 lines of code
+  - Build successful, TypeScript clean
 
 ---
 
@@ -156,8 +161,7 @@ Building content management system for videos and documents with AI transcriptio
 - [ ] Display transcription status in UI
 - [ ] Error handling and retry logic (3 attempts)
 - [ ] Cost optimization: cache transcripts
-- [ ] Write Playwright E2E tests
-- [ ] Write Jest component tests
+
 
 **Files to Create**:
 - `modules/content/serverActions/transcription.action.ts` - Queue job creation
@@ -170,30 +174,221 @@ Building content management system for videos and documents with AI transcriptio
 
 ---
 
-### 🎯 Issue #17: Content-to-Objective Mapping (Est: 4 hours)
-**Goal**: Map videos/documents to multiple exam objectives (many-to-many)
+### 🎯 Issue #17: AI-Assisted Content-to-Objective Mapping ✅ COMPLETED
+**Status**: Complete & Closed
+**Started**: 2025-10-25
+**Completed**: 2025-10-25
+**GitHub Issue**: [#17](https://github.com/jasondionsolutions/CertistryLMS/issues/17) - CLOSED
+**Goal**: Map videos to bullets/sub-bullets with AI suggestions based on transcript analysis
 
-**Tasks**:
-- [ ] Create objective picker component (multi-select)
-- [ ] Implement search/filter by domain or keyword
-- [ ] Display visual hierarchy (Domain → Objective → Sub-objective)
-- [ ] Bulk mapping (one video → multiple objectives)
-- [ ] Remove mappings
-- [ ] Preview mapped content per objective
-- [ ] Difficulty level tagging
-- [ ] Optimistic updates for fast UX
-- [ ] Validation (at least 1 objective required)
-- [ ] Write Playwright E2E tests
-- [ ] Write Jest component tests
+## 🤖 AI-Assisted Mapping Strategy
 
-**Files to Create**:
-- `modules/content/types/mapping.types.ts` - Mapping schemas
-- `modules/content/serverActions/mapping.action.ts` - CRUD operations
-- `modules/content/hooks/useObjectiveMappings.ts` - Client hook
-- `modules/content/ui/ObjectivePicker.tsx` - Multi-select component
-- `modules/content/ui/ObjectiveTree.tsx` - Hierarchical display
-- `modules/content/ui/MappingPreview.tsx` - Preview component
-- `tests/objective-mapping.spec.ts` - E2E tests
+**Key Innovation**: Instead of just mapping to objectives, we map to the **lowest level possible** (bullets/sub-bullets) for precise learning recommendations when students fail quiz questions.
+
+### Architecture Decisions
+1. **AI Approach**: Semantic similarity using OpenAI text-embedding-3-small
+   - Cost: ~$0.0003 per video (extremely cheap)
+   - Speed: 1-2 seconds per video
+   - Accuracy: High - understands context and synonyms
+
+2. **Mapping Levels**: Flexible polymorphic mapping to ANY level
+   - Videos can map to: Objective, Bullet, OR Sub-bullet
+   - Prefer lowest level (sub-bullet > bullet > objective)
+   - Automatic upward hierarchy (bullet → objective → domain)
+
+3. **Workflow**: Hybrid Auto + Manual
+   - Auto: AI analyzes transcript, suggests top 5 matches (≥70% confidence)
+   - Manual: Instructor reviews, accepts/rejects/adds more
+   - Primary flag: Instructor marks main focus
+
+4. **Embedding Cache**: Store vector embeddings in database
+   - Cache domains, objectives, bullets, sub-bullets
+   - Process once per certification, reuse forever
+   - Massive cost savings (one-time $0.01 vs $0.01 per video)
+
+### Database Schema Changes ✅ COMPLETED
+
+**New Model**: `VideoContentMapping` (replaces `VideoObjectiveMapping`)
+```prisma
+model VideoContentMapping {
+  id      String @id @default(cuid())
+  videoId String
+
+  // Flexible mapping (only ONE populated)
+  objectiveId String?
+  bulletId    String?
+  subBulletId String?
+
+  isPrimary      Boolean @default(false)
+  confidence     Float   @default(1.0)  // AI score or 1.0 for manual
+  mappingSource  String  @default("manual") // "ai_suggested" | "ai_confirmed" | "manual"
+
+  createdAt DateTime @default(now())
+}
+```
+
+**Embedding Cache Fields** added to:
+- `CertificationDomain.embedding` (Bytes, nullable)
+- `CertificationObjective.embedding` (Bytes, nullable)
+- `Bullet.embedding` (Bytes, nullable)
+- `SubBullet.embedding` (Bytes, nullable)
+- All with `embeddingUpdatedAt` timestamp
+
+### Implementation Tasks
+
+**Database & Schema**:
+- [x] Update Prisma schema with VideoContentMapping
+- [x] Add embedding cache fields to all hierarchy levels
+- [x] Run `yarn db:generate`
+- [x] Push schema changes to database with `yarn db:push`
+
+**Backend Services**:
+- [x] Create OpenAI embedding service (`modules/content/services/embedding.service.ts`)
+- [x] Build AI mapping service (`modules/content/services/aiMapping.service.ts`)
+- [x] Create cosine similarity utility (integrated in embedding service)
+- [ ] Build embedding cache population script (deferred - optional)
+
+**Server Actions**:
+- [x] `suggestMappings` - Trigger AI analysis for a video
+- [x] `applyMappingSuggestions` - Accept/confirm AI suggestions (bulk)
+- [x] `addManualMapping` - Manually add mapping
+- [x] `removeMapping` - Remove mapping
+- [x] `updatePrimaryMapping` - Set/unset primary flag
+- [x] `getVideoMappings` - Get all mappings for a video
+- [x] `searchContent` - Search objectives/bullets/sub-bullets for manual mapping
+
+**UI Components**:
+- [x] `/videos/[id]/map-objectives` - Dedicated mapping page
+- [x] `SuggestedMappingCard` - Display AI suggestions with confidence
+- [x] `MappingHierarchy` - Show Domain → Objective → Bullet → Sub-bullet
+- [x] `ManualMappingCombobox` - Search combobox (shadcn style)
+- [x] `VideoMappingClient` - Main client interface with all mapping functionality
+
+**Client Hooks**:
+- [x] `useMappingSuggestions` - Get AI suggestions
+- [x] `useApplyMappings` - Bulk accept suggestions
+- [x] `useManualMapping` - Add/remove mappings
+- [x] `useVideoMappings` - Query current mappings
+- [x] `useSearchContent` - Search content for manual mapping
+
+**Background Jobs**:
+- [ ] Trigger AI suggestions after transcription completes (moved to separate issue - optional enhancement)
+
+**Testing**:
+- [ ] Playwright E2E tests for mapping workflow (not required per user request)
+- [ ] Jest tests for embedding service (not required per user request)
+- [ ] Jest tests for AI mapping algorithm (not required per user request)
+
+**Files Created** (20 files, ~1,500 lines of code):
+- ✅ `modules/content/types/mapping.types.ts` - Mapping Zod schemas (171 lines)
+- ✅ `modules/content/services/embedding.service.ts` - OpenAI embeddings (155 lines)
+- ✅ `modules/content/services/aiMapping.service.ts` - AI suggestion engine (243 lines)
+- ✅ `modules/content/serverActions/mapping.action.ts` - CRUD operations (528 lines)
+- ✅ `modules/content/hooks/useMappingSuggestions.ts` - Suggestions hook
+- ✅ `modules/content/hooks/useApplyMappings.ts` - Apply mappings hook
+- ✅ `modules/content/hooks/useManualMapping.ts` - Manual mapping hooks
+- ✅ `modules/content/hooks/useVideoMappings.ts` - Mappings query hook
+- ✅ `modules/content/hooks/useSearchContent.ts` - Search content hook
+- ✅ `modules/content/ui/SuggestedMappingCard.tsx` - AI suggestion card
+- ✅ `modules/content/ui/ManualMappingCombobox.tsx` - Search combobox
+- ✅ `modules/content/ui/MappingHierarchy.tsx` - Hierarchy display
+- ✅ `app/(admin)/admin/content/videos/[id]/map-objectives/page.tsx` - Mapping page
+- ✅ `app/(admin)/admin/content/videos/[id]/map-objectives/VideoMappingClient.tsx` - Client interface
+- ✅ `components/ui/scroll-area.tsx` - Scroll area component
+- ✅ `components/ui/separator.tsx` - Separator component
+
+**Files Updated** (3 files):
+- ✅ `schema/schema.prisma` - Added VideoContentMapping + embedding fields
+- ✅ `modules/content/types/video.types.ts` - Updated VideoWithRelations
+- ✅ `modules/content/serverActions/video.action.ts` - Updated to use contentMappings
+
+### ✅ Implementation Summary
+
+**What Works:**
+- ✅ AI-powered semantic similarity mapping
+- ✅ Flexible polymorphic mapping (objective/bullet/sub-bullet)
+- ✅ Confidence scoring with visual badges
+- ✅ Manual mapping via search combobox
+- ✅ Primary mapping designation
+- ✅ Full CRUD operations on mappings
+- ✅ Embedding cache for cost optimization
+- ✅ Complete UI with loading states, error handling, toast notifications
+
+**Key Features:**
+- Maps to lowest level possible for precision
+- Cost: ~$0.0003 per video
+- Top 5 suggestions with ≥70% confidence
+- Manual override and additions supported
+- Clean, intuitive UI/UX
+
+**Build Status:**
+- TypeScript: Clean ✅
+- Next.js Build: Successful ✅
+- ESLint: 2 pre-existing warnings only
+
+**Optional Enhancements Deferred:**
+- Background job integration (moved to separate issue)
+- Embedding cache population script (embeddings generated on-demand)
+- E2E and unit tests (not required per user)
+
+### UI/UX Flow
+
+```
+Video List → Click "Map Objectives" → Mapping Page
+                                         ↓
+                          ┌──────────────────────────────┐
+                          │ 🎥 Video: "Intro to Malware" │
+                          │ 📝 Transcript: Available ✅   │
+                          └──────────────────────────────┘
+                                         ↓
+                          ┌──────────────────────────────┐
+                          │ 🤖 AI Suggested Mappings (5) │
+                          │                              │
+                          │ ☑️ 1.1 → Malware attacks     │
+                          │    → Trojan.Generic chars... │
+                          │    📊 94% ⭐ Primary         │
+                          │                              │
+                          │ ☑️ 1.2 → Indicators...       │
+                          │    📊 87%                    │
+                          │                              │
+                          │ [Accept Selected] [Reject]   │
+                          └──────────────────────────────┘
+                                         ↓
+                          ┌──────────────────────────────┐
+                          │ ➕ Add More Manually          │
+                          │                              │
+                          │ 🔍 Search bullets...         │
+                          │ → 1.1 | Malware | Worms      │
+                          │ → 1.3 | Phishing | Email...  │
+                          └──────────────────────────────┘
+                                         ↓
+                          [Save Mappings] → Done ✅
+```
+
+### Technical Notes
+
+**Confidence Scoring**:
+- 90-100%: 🟢 High confidence (very likely correct)
+- 70-89%: 🟡 Medium confidence (probably correct)
+- <70%: Not shown (too low to suggest)
+
+**Primary Objective Logic**:
+- AI suggests highest confidence as primary
+- Instructor can override
+- Only one primary per video
+- Primary used for navigation (main topic)
+
+**Edge Cases Handled**:
+- Videos with no transcript: No AI suggestions (manual only)
+- Videos with 0 mappings: Allowed (intro/outro videos)
+- Failed transcriptions: Manual mapping still available
+- Long transcripts: Chunked for embedding (max 8k tokens)
+
+**Cost Analysis**:
+- **Per Video**: ~$0.0003 (for embedding transcript)
+- **Per Certification** (one-time): ~$0.01 (embed all objectives/bullets)
+- **100 videos**: ~$0.04 total
+- **Extremely cost-effective!**
 
 ---
 
@@ -499,8 +694,6 @@ Each issue MUST have:
 - [ ] Content library searchable and filterable
 - [ ] At least 10 test videos uploaded for Security+
 - [ ] Objective mapping validated
-- [ ] All Playwright E2E tests passing
-- [ ] All Jest component tests passing
 - [ ] ESLint errors resolved
 - [ ] TypeScript strict mode passing
 

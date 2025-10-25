@@ -175,16 +175,48 @@ export interface VideoWithRelations {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-  objectiveMappings: Array<{
+  contentMappings: Array<{
     id: string;
-    objectiveId: string;
+    objectiveId: string | null;
+    bulletId: string | null;
+    subBulletId: string | null;
     isPrimary: boolean;
-    objective: {
+    confidence: number;
+    mappingSource: string;
+    objective?: {
       id: string;
       code: string;
       description: string;
       domain: {
         name: string;
+      };
+    };
+    bullet?: {
+      id: string;
+      text: string;
+      objective: {
+        id: string;
+        code: string;
+        description: string;
+        domain: {
+          name: string;
+        };
+      };
+    };
+    subBullet?: {
+      id: string;
+      text: string;
+      bullet: {
+        id: string;
+        text: string;
+        objective: {
+          id: string;
+          code: string;
+          description: string;
+          domain: {
+            name: string;
+          };
+        };
       };
     };
   }>;
