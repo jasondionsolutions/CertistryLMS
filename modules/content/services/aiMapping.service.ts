@@ -17,7 +17,7 @@ import {
   cosineSimilarity,
 } from "./embedding.service";
 
-const CONFIDENCE_THRESHOLD = 0.7; // 70% minimum similarity
+const CONFIDENCE_THRESHOLD = 0.6; // 60% minimum similarity (adjusted for semantic embeddings)
 const MAX_SUGGESTIONS = 5; // Top 5 suggestions
 
 export interface MappingSuggestion {
