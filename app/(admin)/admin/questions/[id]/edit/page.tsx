@@ -29,15 +29,11 @@ type CertificationWithDomains = Certification & {
 interface QuestionForm {
   id: string;
   certificationId: string;
-  objectiveId?: string;
-  bulletId?: string;
-  subBulletId?: string;
+  domainId: string;
+  objectiveId: string;
   text: string;
-  type: "multiple_choice" | "true_false";
-  questionType?: string;
-  difficulty: "easy" | "medium" | "hard";
-  choices: QuestionOption[];
-  correctAnswer: string;
+  type: "multiple_choice" | "multi_select";
+  options: QuestionOption[];
   explanation: string;
 }
 
@@ -54,11 +50,8 @@ const getDefaultOptions = (type: string) => {
         ...EMPTY_OPTION,
         isCorrect: false
       }));
-    case "true_false":
-      return [
-        { text: "True", isCorrect: false, explanation: "" },
-        { text: "False", isCorrect: false, explanation: "" }
-      ];
+    case "multi_select":
+      return Array(6).fill(null).map(() => ({ ...EMPTY_OPTION }));
     default:
       return [{ ...EMPTY_OPTION }];
   }
@@ -74,13 +67,11 @@ function QuestionEditPageContent() {
   const [question, setQuestion] = useState<QuestionForm>({
     id: "",
     certificationId: "",
+    domainId: "",
     objectiveId: "",
     text: "",
     type: "multiple_choice",
-    questionType: "",
-    difficulty: "medium",
-    choices: getDefaultOptions("multiple_choice"),
-    correctAnswer: "",
+    options: getDefaultOptions("multiple_choice"),
     explanation: "",
   });
 
@@ -90,6 +81,7 @@ function QuestionEditPageContent() {
   const [saving, setSaving] = useState(false);
 
   const [showCertificationDropdown, setShowCertificationDropdown] = useState(false);
+  const [showDomainDropdown, setShowDomainDropdown] = useState(false);
   const [showObjectiveDropdown, setShowObjectiveDropdown] = useState(false);
 
   // AI Generation state
@@ -118,13 +110,11 @@ function QuestionEditPageContent() {
           setQuestion({
             id: questionData.id,
             certificationId: questionData.certificationId || "",
+            domainId: questionData.domainId || "",
             objectiveId: questionData.objectiveId || "",
             text: questionData.text || "",
-            type: (questionData.type as "multiple_choice" | "true_false") || "multiple_choice",
-            questionType: questionData.questionType || "",
-            difficulty: (questionData.difficulty as "easy" | "medium" | "hard") || "medium",
-            choices: Array.isArray(questionData.choices) ? questionData.choices : getDefaultOptions("multiple_choice"),
-            correctAnswer: questionData.correctAnswer || "",
+            type: (questionData.type as "multiple_choice" | "multi_select") || "multiple_choice",
+            options: Array.isArray(questionData.choices) ? questionData.choices : getDefaultOptions("multiple_choice"),
             explanation: questionData.explanation || "",
           });
 
@@ -161,6 +151,7 @@ function QuestionEditPageContent() {
     setQuestion(prev => ({
       ...prev,
       certificationId,
+      domainId: "",
       objectiveId: ""
     }));
 
@@ -177,6 +168,15 @@ function QuestionEditPageContent() {
     setShowCertificationDropdown(false);
   };
 
+  const handleDomainChange = (domainId: string) => {
+    setQuestion(prev => ({
+      ...prev,
+      domainId,
+      objectiveId: ""
+    }));
+    setShowDomainDropdown(false);
+  };
+
   const handleObjectiveChange = (objectiveId: string) => {
     setQuestion(prev => ({
       ...prev,
@@ -186,7 +186,7 @@ function QuestionEditPageContent() {
   };
 
   const handleOptionChange = (index: number, field: keyof QuestionOption, value: string | boolean) => {
-    const newOptions = [...question.choices];
+    const newOptions = [...question.options];
     if (field === "isCorrect" && value === true && question.type === "multiple_choice") {
       newOptions.forEach((opt, i) => {
         opt.isCorrect = i === index;
@@ -200,25 +200,25 @@ function QuestionEditPageContent() {
         newOptions[index].isCorrect = value;
       }
     }
-    setQuestion(prev => ({ ...prev, choices: newOptions }));
+    setQuestion(prev => ({ ...prev, options: newOptions }));
   };
 
   const handleAddOption = () => {
     setQuestion(prev => ({
       ...prev,
-      choices: [...prev.choices, { ...EMPTY_OPTION }]
+      options: [...prev.options, { ...EMPTY_OPTION }]
     }));
   };
 
   const handleRemoveOption = (index: number) => {
-    if (question.choices.length <= 2) {
+    if (question.options.length <= 2) {
       toast.error("Questions must have at least 2 options");
       return;
     }
 
     setQuestion(prev => ({
       ...prev,
-      choices: prev.choices.filter((_, i) => i !== index)
+      options: prev.options.filter((_, i) => i !== index)
     }));
   };
 
@@ -226,7 +226,7 @@ function QuestionEditPageContent() {
     setQuestion(prev => ({
       ...prev,
       text: generatedData.text,
-      choices: generatedData.options,
+      options: generatedData.options,
       explanation: ""
     }));
 
@@ -234,12 +234,15 @@ function QuestionEditPageContent() {
   };
 
   const handleOptionLetterClick = (index: number) => {
-    if (question.type === "multiple_choice" || question.type === "true_false") {
-      const newOptions = question.choices.map((opt, i) => ({
+    if (question.type === "multiple_choice") {
+      const newOptions = question.options.map((opt, i) => ({
         ...opt,
         isCorrect: i === index ? !opt.isCorrect : false
       }));
-      setQuestion(prev => ({ ...prev, choices: newOptions }));
+      setQuestion(prev => ({ ...prev, options: newOptions }));
+    } else {
+      // For multi-select, toggle the option
+      handleOptionChange(index, "isCorrect", !question.options[index].isCorrect);
     }
   };
 
@@ -252,20 +255,24 @@ function QuestionEditPageContent() {
       toast.error("Please select a certification");
       return;
     }
+    if (!question.domainId) {
+      toast.error("Please select a domain");
+      return;
+    }
     if (!question.objectiveId) {
       toast.error("Please select an objective");
       return;
     }
-    if (question.choices.length === 0) {
+    if (question.options.length === 0) {
       toast.error("Question must have at least one option");
       return;
     }
-    if (question.choices.some(opt => !opt.text.trim())) {
+    if (question.options.some(opt => !opt.text.trim())) {
       toast.error("All options must have text");
       return;
     }
 
-    if (!question.choices.some(opt => opt.isCorrect)) {
+    if (!question.options.some(opt => opt.isCorrect)) {
       toast.error("Please select at least one correct answer before saving");
       return;
     }
@@ -277,10 +284,9 @@ function QuestionEditPageContent() {
         objectiveId: question.objectiveId,
         text: question.text,
         type: question.type,
-        questionType: question.questionType,
-        difficulty: question.difficulty,
-        choices: question.choices,
-        correctAnswer: question.choices.find(c => c.isCorrect)?.text || "",
+        difficulty: "medium",
+        choices: question.options,
+        correctAnswer: question.options.filter(c => c.isCorrect).map(c => c.text).join(", "),
         explanation: question.explanation || ""
       };
 
@@ -296,7 +302,7 @@ function QuestionEditPageContent() {
         const result = await updateQuestionHook(question.id, questionData);
         if (result.success) {
           toast.success("Question updated successfully!");
-          router.push(`/admin/questions/${question.id}`);
+          router.push(`/admin/questions/${question.id}/view`);
         } else {
           toast.error(result.error || "Failed to update question");
         }
@@ -309,9 +315,14 @@ function QuestionEditPageContent() {
     }
   };
 
+  const getAvailableDomains = () => {
+    return selectedCertification?.domains || [];
+  };
+
   const getAvailableObjectives = () => {
-    if (!selectedCertification) return [];
-    return selectedCertification.domains.flatMap(d => d.objectives);
+    if (!question.domainId || !selectedCertification?.domains) return [];
+    const domain = selectedCertification.domains.find(d => d.id === question.domainId);
+    return domain?.objectives || [];
   };
 
   const getCurrentCertificationName = () => {
@@ -319,29 +330,29 @@ function QuestionEditPageContent() {
     return cert ? cert.name : "Select Certification";
   };
 
+  const getCurrentDomainName = () => {
+    const domains = getAvailableDomains();
+    const domain = domains.find(d => d.id === question.domainId);
+    return domain ? `Domain ${domain.name}` : "Select Domain";
+  };
+
   const getCurrentObjectiveName = () => {
     const objectives = getAvailableObjectives();
     const objective = objectives.find(o => o.id === question.objectiveId);
-    return objective ? `${objective.code}` : "Select Objective";
+    return objective ? `Objective ${objective.code}` : "Select Objective";
+  };
+
+  const getCurrentDomain = () => {
+    return getAvailableDomains().find(d => d.id === question.domainId);
   };
 
   const getCurrentObjective = () => {
     return getAvailableObjectives().find(o => o.id === question.objectiveId);
   };
 
-  const getCurrentDomain = () => {
-    if (!selectedCertification || !question.objectiveId) return null;
-    for (const domain of selectedCertification.domains) {
-      if (domain.objectives.some(o => o.id === question.objectiveId)) {
-        return domain;
-      }
-    }
-    return null;
-  };
-
   const generateExplanation = () => {
-    const correctOptions = question.choices.filter(opt => opt.isCorrect);
-    const incorrectOptions = question.choices.filter(opt => !opt.isCorrect);
+    const correctOptions = question.options.filter(opt => opt.isCorrect);
+    const incorrectOptions = question.options.filter(opt => !opt.isCorrect);
 
     const explanations = [
       ...correctOptions.map(opt => opt.explanation).filter(Boolean),
@@ -426,14 +437,14 @@ function QuestionEditPageContent() {
             size="sm"
             onClick={() => setShowAIModal(true)}
             className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0"
-            disabled={!question.certificationId || !question.objectiveId}
+            disabled={!question.certificationId || !question.domainId || !question.objectiveId}
           >
             <Brain className="w-4 h-4 mr-2" />
             AI Generate
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           {/* Certification */}
           <div className="space-y-2">
             <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Certification</span>
@@ -446,7 +457,7 @@ function QuestionEditPageContent() {
                 <Pencil size={14} />
               </button>
               {showCertificationDropdown && (
-                <div className="absolute top-full left-0 mt-1 bg-background border rounded-md shadow-lg z-10 w-full min-w-[250px] max-h-60 overflow-y-auto">
+                <div className="absolute top-full left-0 mt-1 bg-background border rounded-md shadow-lg z-10 w-full min-w-[250px]">
                   {certifications
                     .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                     .map(cert => (
@@ -463,6 +474,34 @@ function QuestionEditPageContent() {
             </div>
           </div>
 
+          {/* Domain */}
+          <div className="space-y-2">
+            <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Domain</span>
+            <div className="relative">
+              <button
+                onClick={() => setShowDomainDropdown(!showDomainDropdown)}
+                className="flex items-center gap-2 hover:text-primary w-full p-2 border rounded-md bg-background"
+                disabled={!question.certificationId}
+              >
+                <span className="flex-1 text-left font-medium">{getCurrentDomainName()}</span>
+                <Pencil size={12} />
+              </button>
+              {showDomainDropdown && question.certificationId && (
+                <div className="absolute top-full left-0 mt-1 bg-background border rounded-md shadow-lg z-10 w-full min-w-[250px]">
+                  {getAvailableDomains().map((domain) => (
+                    <button
+                      key={domain.id}
+                      onClick={() => handleDomainChange(domain.id)}
+                      className="block w-full text-left px-3 py-2 hover:bg-muted text-sm"
+                    >
+                      {domain.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Objective */}
           <div className="space-y-2">
             <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Objective</span>
@@ -470,13 +509,13 @@ function QuestionEditPageContent() {
               <button
                 onClick={() => setShowObjectiveDropdown(!showObjectiveDropdown)}
                 className="flex items-center gap-2 hover:text-primary w-full p-2 border rounded-md bg-background"
-                disabled={!question.certificationId}
+                disabled={!question.domainId}
               >
                 <span className="flex-1 text-left font-medium">{getCurrentObjectiveName()}</span>
                 <Pencil size={12} />
               </button>
-              {showObjectiveDropdown && question.certificationId && (
-                <div className="absolute top-full left-0 mt-1 bg-background border rounded-md shadow-lg z-10 w-full min-w-[300px] max-h-60 overflow-y-auto">
+              {showObjectiveDropdown && question.domainId && (
+                <div className="absolute top-full left-0 mt-1 bg-background border rounded-md shadow-lg z-10 w-full min-w-[300px]">
                   {getAvailableObjectives().map((objective) => (
                     <button
                       key={objective.id}
@@ -492,58 +531,53 @@ function QuestionEditPageContent() {
           </div>
         </div>
 
-        {/* Question Type and Difficulty */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Question Type</span>
-            <div className="flex gap-6">
-              {[
-                { value: "multiple_choice", label: "Multiple Choice" },
-                { value: "true_false", label: "True/False" }
-              ].map((type) => (
-                <label key={type.value} className="flex items-center space-x-2 cursor-pointer text-sm">
-                  <input
-                    type="radio"
-                    name="questionType"
-                    value={type.value}
-                    checked={question.type === type.value}
-                    onChange={(e) => {
-                      const newType = e.target.value as "multiple_choice" | "true_false";
-                      setQuestion(prev => ({
+        {/* Question Types */}
+        <div className="space-y-2">
+          <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Question Type</span>
+          <div className="flex gap-6">
+            {[
+              { value: "multiple_choice", label: "Multiple Choice" },
+              { value: "multi_select", label: "Multi-Select" }
+            ].map((type) => (
+              <label key={type.value} className="flex items-center space-x-2 cursor-pointer text-sm">
+                <input
+                  type="radio"
+                  name="questionType"
+                  value={type.value}
+                  checked={question.type === type.value}
+                  onChange={(e) => {
+                    const newType = e.target.value as "multiple_choice" | "multi_select";
+                    setQuestion(prev => {
+                      let updatedOptions = [...prev.options];
+
+                      if (newType === "multiple_choice" && updatedOptions.length > 4) {
+                        updatedOptions = updatedOptions.slice(0, 4);
+                      } else if (newType === "multi_select" && updatedOptions.length < 6) {
+                        while (updatedOptions.length < 6) {
+                          updatedOptions.push({ ...EMPTY_OPTION });
+                        }
+                      }
+
+                      if (newType === "multiple_choice" && prev.type === "multi_select") {
+                        const firstCorrectIndex = updatedOptions.findIndex(opt => opt.isCorrect);
+                        updatedOptions = updatedOptions.map((opt, i) => ({
+                          ...opt,
+                          isCorrect: i === firstCorrectIndex && firstCorrectIndex !== -1
+                        }));
+                      }
+
+                      return {
                         ...prev,
                         type: newType,
-                        choices: getDefaultOptions(newType)
-                      }));
-                    }}
-                    className="w-3 h-3"
-                  />
-                  <span>{type.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Difficulty</span>
-            <div className="flex gap-4">
-              {[
-                { value: "easy", label: "Easy" },
-                { value: "medium", label: "Medium" },
-                { value: "hard", label: "Hard" }
-              ].map((diff) => (
-                <label key={diff.value} className="flex items-center space-x-2 cursor-pointer text-sm">
-                  <input
-                    type="radio"
-                    name="difficulty"
-                    value={diff.value}
-                    checked={question.difficulty === diff.value}
-                    onChange={(e) => setQuestion(prev => ({ ...prev, difficulty: e.target.value as "easy" | "medium" | "hard" }))}
-                    className="w-3 h-3"
-                  />
-                  <span>{diff.label}</span>
-                </label>
-              ))}
-            </div>
+                        options: updatedOptions
+                      };
+                    });
+                  }}
+                  className="w-3 h-3"
+                />
+                <span>{type.label}</span>
+              </label>
+            ))}
           </div>
         </div>
       </div>
@@ -573,7 +607,7 @@ function QuestionEditPageContent() {
             ANSWER OPTIONS
           </h3>
           <div className="space-y-3">
-            {question.choices.map((option, index) => {
+            {question.options.map((option, index) => {
               const letter = getOptionLetter(index);
               return (
                 <div
@@ -620,7 +654,7 @@ function QuestionEditPageContent() {
                         </span>
                       )}
                     </div>
-                    {question.choices.length > 2 && question.type !== "true_false" && (
+                    {question.options.length > 2 && (
                       <button
                         onClick={() => handleRemoveOption(index)}
                         className="flex-shrink-0 w-8 h-8 rounded-full border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center transition-colors"
@@ -634,15 +668,13 @@ function QuestionEditPageContent() {
               );
             })}
 
-            {question.type !== "true_false" && (
-              <button
-                onClick={handleAddOption}
-                className="w-full border-2 border-dashed border-border hover:border-primary rounded-lg p-4 flex items-center justify-center gap-2 text-muted-foreground hover:text-primary transition-colors"
-              >
-                <Plus size={16} />
-                <span className="font-medium">Add Option</span>
-              </button>
-            )}
+            <button
+              onClick={handleAddOption}
+              className="w-full border-2 border-dashed border-border hover:border-primary rounded-lg p-4 flex items-center justify-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Plus size={16} />
+              <span className="font-medium">Add Option</span>
+            </button>
           </div>
         </div>
 
@@ -657,13 +689,13 @@ function QuestionEditPageContent() {
           </div>
         )}
 
-        {question.objectiveId && selectedCertification && (
+        {question.domainId && selectedCertification && (
           <div className="text-sm text-muted-foreground space-y-1 pt-6 border-t">
             <div>
-              Domain: {getCurrentDomain()?.name || "Unknown Domain"}
+              Domain {getCurrentDomain()?.name || "Unknown Domain"}
             </div>
             <div>
-              Objective: {getCurrentObjective()?.code} – {getCurrentObjective()?.description || "Unknown Objective"}
+              Objective {getCurrentObjective()?.code} – {getCurrentObjective()?.description || "Unknown Objective"}
             </div>
           </div>
         )}
@@ -700,11 +732,11 @@ function QuestionEditPageContent() {
         onClose={() => setShowAIModal(false)}
         onGenerate={handleAIGenerate}
         examName={selectedCertification?.name}
-        domainNumber={getCurrentDomain()?.name || ""}
-        domainName={getCurrentDomain()?.name || ""}
-        objectiveNumber={getCurrentObjective()?.code || ""}
-        objectiveName={getCurrentObjective()?.description || ""}
-        questionType={question.type === "true_false" ? "multiple_choice" : question.type}
+        domainNumber={question.domainId}
+        domainName={getCurrentDomain()?.name}
+        objectiveNumber={question.objectiveId}
+        objectiveName={getCurrentObjective()?.description}
+        questionType={question.type}
       />
     </main>
   );
