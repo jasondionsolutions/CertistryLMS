@@ -2,7 +2,7 @@
 
 // Question data hooks
 export * from "./useQuestions";
-// export * from "./useQuestionData"; // Commented out - requires getQuestionWithDomainData server action
+export * from "./useQuestionData"; // Now enabled - getQuestionWithDomainData server action added
 
 // AI-powered hooks
 export * from "./useQuestionAI";

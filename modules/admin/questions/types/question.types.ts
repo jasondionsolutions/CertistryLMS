@@ -61,6 +61,28 @@ export interface QuestionData {
   taskId?: string; // Optional - for associating questions with tasks
 }
 
+export interface SerializedQuestionWithDomainData {
+  id: string;
+  certificationId: string;
+  certificationName: string;
+  certificationCode: string;
+  domainId: string;
+  domainName: string;
+  objectiveId: string;
+  objectiveCode: string;
+  objectiveName: string;
+  text: string;
+  type: string;
+  questionType?: string;
+  difficulty: string;
+  choices: QuestionOption[];
+  correctAnswer: string;
+  explanation: string;
+  taskId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BulkEditData {
   certificationId?: string;
   objectiveId?: string;

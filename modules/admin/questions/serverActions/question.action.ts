@@ -8,6 +8,7 @@ import type { AuthContext } from "@/lib/auth/types";
 import type {
   SerializedQuestion,
   SerializedQuestionWithHierarchy,
+  SerializedQuestionWithDomainData,
   QuestionData,
   BulkEditData,
   QuestionOption,
@@ -590,6 +591,140 @@ async function _bulkDeleteQuestions(
 export const bulkDeleteQuestions = withPermission("questions.delete")(
   _bulkDeleteQuestions
 );
+
+// ============================================================================
+// QUESTION WITH DOMAIN DATA
+// ============================================================================
+
+export async function getQuestionWithDomainData(
+  id: string
+): Promise<SerializedQuestionWithDomainData | null> {
+  try {
+    const question = await prisma.question.findUnique({
+      where: { id },
+      include: {
+        objective: {
+          include: {
+            domain: {
+              include: {
+                certification: true,
+              },
+            },
+          },
+        },
+        bullet: {
+          include: {
+            objective: {
+              include: {
+                domain: {
+                  include: {
+                    certification: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        subBullet: {
+          include: {
+            bullet: {
+              include: {
+                objective: {
+                  include: {
+                    domain: {
+                      include: {
+                        certification: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        task: true,
+      },
+    });
+
+    if (!question) {
+      return null;
+    }
+
+    // Determine hierarchy level and extract data
+    let certificationId = "";
+    let certificationName = "";
+    let certificationCode = "";
+    let domainId = "";
+    let domainName = "";
+    let objectiveId = "";
+    let objectiveCode = "";
+    let objectiveName = "";
+
+    if (question.objective) {
+      // Direct objective mapping
+      objectiveId = question.objective.id;
+      objectiveCode = question.objective.code;
+      objectiveName = question.objective.description;
+      domainId = question.objective.domain.id;
+      domainName = question.objective.domain.name;
+      certificationId = question.objective.domain.certification.id;
+      certificationName = question.objective.domain.certification.name;
+      certificationCode = question.objective.domain.certification.code;
+    } else if (question.bullet) {
+      // Bullet mapping
+      objectiveId = question.bullet.objective.id;
+      objectiveCode = question.bullet.objective.code;
+      objectiveName = question.bullet.objective.description;
+      domainId = question.bullet.objective.domain.id;
+      domainName = question.bullet.objective.domain.name;
+      certificationId = question.bullet.objective.domain.certification.id;
+      certificationName = question.bullet.objective.domain.certification.name;
+      certificationCode = question.bullet.objective.domain.certification.code;
+    } else if (question.subBullet) {
+      // Sub-bullet mapping
+      objectiveId = question.subBullet.bullet.objective.id;
+      objectiveCode = question.subBullet.bullet.objective.code;
+      objectiveName = question.subBullet.bullet.objective.description;
+      domainId = question.subBullet.bullet.objective.domain.id;
+      domainName = question.subBullet.bullet.objective.domain.name;
+      certificationId = question.subBullet.bullet.objective.domain.certification.id;
+      certificationName = question.subBullet.bullet.objective.domain.certification.name;
+      certificationCode = question.subBullet.bullet.objective.domain.certification.code;
+    }
+
+    // Parse choices from JSON
+    const choices = Array.isArray(question.choices)
+      ? question.choices
+      : typeof question.choices === "string"
+      ? JSON.parse(question.choices)
+      : [];
+
+    return {
+      id: question.id,
+      certificationId,
+      certificationName,
+      certificationCode,
+      domainId,
+      domainName,
+      objectiveId,
+      objectiveCode,
+      objectiveName,
+      text: question.text,
+      type: question.type,
+      questionType: question.questionType || undefined,
+      difficulty: question.difficulty,
+      choices,
+      correctAnswer: question.correctAnswer,
+      explanation: question.explanation,
+      taskId: question.taskId || undefined,
+      createdAt: question.createdAt.toISOString(),
+      updatedAt: question.updatedAt.toISOString(),
+    };
+  } catch (error) {
+    console.error("Error fetching question with domain data:", error);
+    return null;
+  }
+}
 
 // ============================================================================
 // TASK PROGRESS HELPER
