@@ -21,17 +21,47 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
  * - Orphan file detection and cleanup
  */
 
-// Initialize S3 Client
-const s3Client = new S3Client({
-  region: process.env.AWS_S3_REGION!,
-  credentials: {
-    accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY!,
-  },
-});
+// Lazy initialization to prevent build-time errors
+let s3Client: S3Client | null = null;
 
-const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME!;
-const FOLDER = process.env.AWS_S3_FOLDER || "dev";
+function getS3Client(): S3Client {
+  if (!s3Client) {
+    const region = process.env.AWS_S3_REGION;
+    const accessKeyId = process.env.AWS_S3_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.AWS_S3_SECRET_ACCESS_KEY;
+
+    if (!region || !accessKeyId || !secretAccessKey) {
+      throw new Error(
+        "Missing required S3 environment variables: AWS_S3_REGION, AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY"
+      );
+    }
+
+    s3Client = new S3Client({
+      region,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+    });
+  }
+  return s3Client;
+}
+
+function getBucketName(): string {
+  const bucketName = process.env.AWS_S3_BUCKET_NAME;
+  if (!bucketName) {
+    throw new Error("Missing required S3 environment variable: AWS_S3_BUCKET_NAME");
+  }
+  return bucketName;
+}
+
+function getFolder(): string {
+  const folder = process.env.AWS_S3_FOLDER;
+  if (!folder) {
+    throw new Error("Missing required S3 environment variable: AWS_S3_FOLDER");
+  }
+  return folder;
+}
 
 // File size limits (in bytes)
 const FILE_SIZE_LIMITS = {
@@ -62,10 +92,10 @@ function generateS3Key(
   const uniqueFileName = `${timestamp}-${sanitizedFileName}`;
 
   if (subfolder) {
-    return `${FOLDER}/${category}/${subfolder}/${uniqueFileName}`;
+    return `${getFolder()}/${category}/${subfolder}/${uniqueFileName}`;
   }
 
-  return `${FOLDER}/${category}/${uniqueFileName}`;
+  return `${getFolder()}/${category}/${uniqueFileName}`;
 }
 
 /**
@@ -121,8 +151,9 @@ export async function uploadFile(
 
   const key = generateS3Key(category, fileName, subfolder);
 
+  const bucketName = getBucketName();
   const command = new PutObjectCommand({
-    Bucket: BUCKET_NAME,
+    Bucket: bucketName,
     Key: key,
     Body: file,
     ContentType: contentType,
@@ -135,10 +166,10 @@ export async function uploadFile(
   });
 
   try {
-    await s3Client.send(command);
+    await getS3Client().send(command);
 
     // Generate URL (will need pre-signed URL for access)
-    const url = `https://${BUCKET_NAME}.s3.${process.env.AWS_S3_REGION}.amazonaws.com/${key}`;
+    const url = `https://${bucketName}.s3.${process.env.AWS_S3_REGION}.amazonaws.com/${key}`;
 
     return { key, url };
   } catch (error) {
@@ -165,12 +196,12 @@ export async function getPresignedDownloadUrl(
   expiresIn: number = 3600
 ): Promise<string> {
   const command = new GetObjectCommand({
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
   });
 
   try {
-    const url = await getSignedUrl(s3Client, command, { expiresIn });
+    const url = await getSignedUrl(getS3Client(), command, { expiresIn });
     return url;
   } catch (error) {
     console.error("Error generating pre-signed URL:", error);
@@ -201,14 +232,14 @@ export async function getPresignedUploadUrl(
   expiresIn: number = 300
 ): Promise<string> {
   const command = new PutObjectCommand({
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
     ContentType: contentType,
     ServerSideEncryption: "AES256",
   });
 
   try {
-    const url = await getSignedUrl(s3Client, command, { expiresIn });
+    const url = await getSignedUrl(getS3Client(), command, { expiresIn });
     return url;
   } catch (error) {
     console.error("Error generating pre-signed upload URL:", error);
@@ -229,12 +260,12 @@ export async function getPresignedUploadUrl(
  */
 export async function deleteFile(key: string): Promise<{ success: boolean }> {
   const command = new DeleteObjectCommand({
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
   });
 
   try {
-    await s3Client.send(command);
+    await getS3Client().send(command);
     return { success: true };
   } catch (error) {
     console.error("Error deleting file from S3:", error);
@@ -309,10 +340,10 @@ export async function replaceFile(
 export async function fileExists(key: string): Promise<boolean> {
   try {
     const command = new HeadObjectCommand({
-      Bucket: BUCKET_NAME,
+      Bucket: getBucketName(),
       Key: key,
     });
-    await s3Client.send(command);
+    await getS3Client().send(command);
     return true;
   } catch {
     return false;
@@ -336,13 +367,13 @@ export async function listFiles(
   maxKeys: number = 1000
 ): Promise<string[]> {
   const command = new ListObjectsV2Command({
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Prefix: prefix,
     MaxKeys: maxKeys,
   });
 
   try {
-    const response = await s3Client.send(command);
+    const response = await getS3Client().send(command);
     return response.Contents?.map((obj) => obj.Key!) || [];
   } catch (error) {
     console.error("Error listing files from S3:", error);
@@ -363,12 +394,12 @@ export async function getFileMetadata(key: string): Promise<{
   metadata: Record<string, string>;
 }> {
   const command = new HeadObjectCommand({
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
   });
 
   try {
-    const response = await s3Client.send(command);
+    const response = await getS3Client().send(command);
     return {
       size: response.ContentLength || 0,
       lastModified: response.LastModified || new Date(),

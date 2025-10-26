@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { validateSession } from "@/lib/auth/validateSession";
 import Link from "next/link";
-import { BookOpen, Users, BarChart } from "lucide-react";
+import { BookOpen, Users, BarChart, FileVideo } from "lucide-react";
 
 /**
  * Admin Dashboard Page
@@ -31,6 +31,14 @@ export default async function AdminDashboardPage() {
       href: "/admin/certifications",
       color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-100 dark:bg-blue-950",
+    },
+    {
+      title: "Content Management",
+      description: "Upload and manage videos, documents, and learning materials",
+      icon: FileVideo,
+      href: "/admin/content",
+      color: "text-purple-600 dark:text-purple-400",
+      bgColor: "bg-purple-100 dark:bg-purple-950",
     },
     {
       title: "User Management",

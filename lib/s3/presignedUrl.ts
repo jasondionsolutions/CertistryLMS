@@ -6,7 +6,7 @@
 
 import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { s3Client, S3_BUCKET_NAME, generateS3Key, getS3PublicUrl } from "./config";
+import { s3Client, getS3BucketName, generateS3Key, getS3PublicUrl } from "./config";
 import type { PresignedUploadResponse } from "@/modules/content/types/video.types";
 
 /**
@@ -27,7 +27,7 @@ export async function generatePresignedUploadUrl(
 
   // Create PutObject command
   const command = new PutObjectCommand({
-    Bucket: S3_BUCKET_NAME,
+    Bucket: getS3BucketName(),
     Key: s3Key,
     ContentType: mimeType,
     // ACL: "public-read", // Make file publicly readable (optional - depends on bucket policy)
@@ -60,7 +60,7 @@ export async function generatePresignedDownloadUrl(
   expiresIn: number = 3600
 ): Promise<string> {
   const command = new GetObjectCommand({
-    Bucket: S3_BUCKET_NAME,
+    Bucket: getS3BucketName(),
     Key: s3Key,
   });
 
@@ -84,7 +84,7 @@ export async function uploadToS3(
   const s3Key = generateS3Key(category, fileName);
 
   const command = new PutObjectCommand({
-    Bucket: S3_BUCKET_NAME,
+    Bucket: getS3BucketName(),
     Key: s3Key,
     Body: file,
     ContentType: mimeType,

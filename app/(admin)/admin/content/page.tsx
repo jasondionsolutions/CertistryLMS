@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Upload, FileVideo, FileText } from "lucide-react";
 import { ContentStats } from "@/modules/content/ui/ContentStats";
 import { ContentFilters } from "@/modules/content/ui/ContentFilters";
 import { ContentGrid } from "@/modules/content/ui/ContentGrid";
@@ -84,11 +85,39 @@ export default function ContentLibraryPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Content Library</h1>
-        <p className="text-muted-foreground">
-          Browse, search, and manage all videos and documents
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Content Library</h1>
+          <p className="text-muted-foreground">
+            Browse, search, and manage all videos and documents
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href="/admin/content/videos">
+              <FileVideo className="h-4 w-4 mr-2" />
+              Videos
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/admin/content/documents">
+              <FileText className="h-4 w-4 mr-2" />
+              Documents
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/admin/content/videos/upload">
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Video
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/admin/content/documents/upload">
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Document
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Statistics Dashboard */}

@@ -9,7 +9,7 @@
 import { prisma } from "@/lib/prisma";
 import { withPermission } from "@/lib/middleware/withPermission";
 import { AuthContext, NotFoundError, ValidationError } from "@/lib/auth/types";
-import { generatePresignedUploadUrl } from "@/lib/s3/presignedUrl";
+import { generatePresignedUploadUrl, generatePresignedDownloadUrl } from "@/lib/s3/presignedUrl";
 import { generateDefaultThumbnailUrl } from "@/lib/s3/thumbnail";
 import { addTranscriptionJob } from "@/lib/queue/transcriptionQueue";
 import type {
@@ -419,6 +419,51 @@ export const listVideos = withPermission("content.read")(
       return {
         success: false,
         error: error instanceof Error ? error.message : "Failed to fetch videos",
+      };
+    }
+  }
+);
+
+/**
+ * Get presigned URL for video playback
+ *
+ * Generates a secure URL for streaming/downloading the video
+ */
+export const getVideoPlaybackUrl = withPermission("content.read")(
+  async (
+    _user: AuthContext,
+    videoId: string
+  ): Promise<{ success: boolean; data?: { url: string; expiresIn: number }; error?: string }> => {
+    try {
+      // Get video to retrieve s3Key
+      const video = await prisma.video.findUnique({
+        where: { id: videoId },
+        select: { s3Key: true },
+      });
+
+      if (!video) {
+        throw new NotFoundError("Video not found");
+      }
+
+      if (!video.s3Key) {
+        throw new ValidationError("Video has no S3 key");
+      }
+
+      // Generate presigned URL (valid for 2 hours)
+      const url = await generatePresignedDownloadUrl(video.s3Key, 7200);
+
+      return {
+        success: true,
+        data: {
+          url,
+          expiresIn: 7200, // 2 hours in seconds
+        },
+      };
+    } catch (error) {
+      console.error("[getVideoPlaybackUrl] Error:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to generate playback URL",
       };
     }
   }

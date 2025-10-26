@@ -509,3 +509,51 @@ export const generateAIDescriptionForDocument = withAccess(
     }
   }
 );
+
+/**
+ * Get presigned URL for document download
+ *
+ * Generates a secure URL for downloading the document
+ */
+export const getDocumentDownloadUrl = withAccess(
+  async (
+    _user: AuthContext,
+    documentId: string
+  ): Promise<{ success: boolean; data?: { url: string; expiresIn: number }; error?: string }> => {
+    try {
+      // Get document to retrieve s3Key
+      const document = await prisma.document.findUnique({
+        where: { id: documentId },
+        select: { s3Key: true },
+      });
+
+      if (!document) {
+        throw new NotFoundError("Document not found");
+      }
+
+      if (!document.s3Key) {
+        return {
+          success: false,
+          error: "Document has no S3 key",
+        };
+      }
+
+      // Generate presigned URL (valid for 2 hours)
+      const url = await generatePresignedDownloadUrl(document.s3Key, 7200);
+
+      return {
+        success: true,
+        data: {
+          url,
+          expiresIn: 7200, // 2 hours in seconds
+        },
+      };
+    } catch (error) {
+      console.error("[getDocumentDownloadUrl] Error:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to generate download URL",
+      };
+    }
+  }
+);

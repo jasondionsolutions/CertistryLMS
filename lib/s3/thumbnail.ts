@@ -87,7 +87,8 @@ export function validateThumbnailFile(file: File): string | null {
  * - Third-party service (e.g., Cloudinary, Mux)
  */
 export async function generateVideoFrameThumbnail(
-  _videoS3Key: string
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  videoS3Key: string
 ): Promise<{ s3Key: string; url: string }> {
   throw new Error("Video frame extraction not yet implemented");
   // Future implementation here

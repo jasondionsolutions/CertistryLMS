@@ -5,6 +5,7 @@ import { BreadcrumbProvider } from "@/components/navigation/breadcrumb-context";
 const adminNavLinks = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/certifications", label: "Certifications" },
+  { href: "/admin/content", label: "Content" },
   { href: "/admin/users", label: "Users" },
 ];
 

@@ -29,7 +29,7 @@ export default function AIModelsPage() {
   const { data: response, isLoading } = useAIModels(false);
   const syncModels = useSyncAIModels();
 
-  const aiModels = response?.data || [];
+  const aiModels = React.useMemo(() => response?.data || [], [response?.data]);
 
   // Filter models by search query
   const filteredModels = React.useMemo(() => {
