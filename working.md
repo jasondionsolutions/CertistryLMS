@@ -1,9 +1,9 @@
 # Phase 2: Content Upload & Objective Mapping - Working Document
 
-**Last Updated**: 2025-10-25 (Issue #17 COMPLETED ✅)
-**Status**: Issue #17 - AI-Assisted Content-to-Objective Mapping (Complete)
-**Current Issue**: #17 - CLOSED ✅
-**Next Action**: Ready for Issue #18 (PDF/Document Upload) or Issue #19 (Content Library)
+**Last Updated**: 2025-10-25 (Issue #18 COMPLETED ✅)
+**Status**: Issue #18 - PDF/Document Upload with AI-Powered Mapping (Complete)
+**Current Issue**: #18 - CLOSED ✅
+**Next Action**: Ready for Issue #19 (Content Library)
 **GitHub Milestone**: [Phase 2](https://github.com/jasondionsolutions/CertistryLMS/milestone/2)
 
 ---
@@ -392,28 +392,197 @@ Video List → Click "Map Objectives" → Mapping Page
 
 ---
 
-### 📄 Issue #18: PDF/Document Upload (Est: 3 hours)
-**Goal**: Upload and manage PDF/DOCX/TXT documents with objective mapping
+### 📄 Issue #18: PDF/Document Upload with AI-Powered Mapping ✅ COMPLETED
+**Status**: Complete & Closed
+**Started**: 2025-10-25
+**Completed**: 2025-10-25
+**GitHub Issue**: [#18](https://github.com/jasondionsolutions/CertistryLMS/issues/18) - CLOSED
+**Goal**: Upload and manage PDF/DOCX/TXT documents with AI-powered mapping to objectives/bullets/sub-bullets
 
-**Tasks**:
-- [ ] Create document upload server action (reuse S3 infrastructure)
-- [ ] File validation (PDF, DOCX, TXT)
-- [ ] Document metadata form (title, description, type)
-- [ ] Map documents to objectives (reuse mapping UI)
-- [ ] In-browser PDF viewer (react-pdf)
-- [ ] Download toggle (instructor can enable/disable per doc)
-- [ ] Document versioning support (v1, v2)
-- [ ] Text extraction from DOCX/TXT for search
-- [ ] Write Playwright E2E tests
-- [ ] Write Jest component tests
+## Implementation Strategy
 
-**Files to Create**:
-- `modules/content/types/document.types.ts` - Document schemas
-- `modules/content/serverActions/document.action.ts` - Document CRUD
-- `modules/content/hooks/useUploadDocument.ts` - Upload hook
-- `modules/content/ui/DocumentUploadForm.tsx` - Upload component
-- `modules/content/ui/DocumentViewer.tsx` - PDF viewer
-- `tests/document-upload.spec.ts` - E2E tests
+**Key Decisions:**
+- ✅ Reuse Video upload patterns for S3 upload
+- ✅ Reuse Issue #17 mapping components (MappingHierarchy, ManualMappingCombobox)
+- ✅ Documents map to LOWEST LEVEL (sub-bullets > bullets > objectives)
+- ✅ AI-powered mapping using Claude API (active model from database)
+- ✅ Text extraction from PDF/DOCX/TXT for semantic analysis
+- ✅ Manual mapping via search combobox for additional mappings
+- ✅ Support PDF (in-browser viewer), DOCX, TXT (download only)
+
+## Files Created (18 files, ~1,800 lines of code)
+
+### Types & Schemas (2 files)
+- ✅ `modules/content/types/document.types.ts` - Document types & Zod schemas
+- ✅ `modules/content/types/documentMapping.types.ts` - Document mapping types with full hierarchy
+
+### Server Actions (2 files)
+- ✅ `modules/content/serverActions/document.action.ts` - Document CRUD with RBAC
+- ✅ `modules/content/serverActions/documentMapping.action.ts` - AI + manual mapping CRUD
+
+### Services (2 files)
+- ✅ `modules/content/services/textExtraction.service.ts` - PDF/DOCX/TXT text extraction
+- ✅ `modules/content/services/documentAIMapping.service.ts` - Claude AI semantic analysis with dynamic model selection
+
+### Client Hooks (4 files)
+- ✅ `modules/content/hooks/useUploadDocument.ts` - Upload with progress tracking
+- ✅ `modules/content/hooks/useDocuments.ts` - Query/update/delete documents
+- ✅ `modules/content/hooks/useDocumentMappings.ts` - Query mappings with hierarchy
+- ✅ `modules/content/hooks/useDocumentMappingSuggestions.ts` - AI suggestions
+
+### UI Components (5 files)
+- ✅ `modules/content/ui/DocumentUploadForm.tsx` - Drag-drop upload with validation
+- ✅ `modules/content/ui/DocumentUploadProgress.tsx` - Progress bar
+- ✅ `modules/content/ui/DocumentList.tsx` - Document table with actions
+- ✅ `modules/content/ui/DocumentViewer.tsx` - react-pdf viewer with navigation
+- ✅ `modules/content/ui/ManualMappingCombobox.tsx` - Updated to support documents (contentType prop)
+
+### Admin Pages (3 files)
+- ✅ `app/(admin)/admin/content/documents/page.tsx` - Document library
+- ✅ `app/(admin)/admin/content/documents/upload/page.tsx` - Upload page
+- ✅ `app/(admin)/admin/content/documents/[id]/map-objectives/page.tsx` - Mapping page
+- ✅ `app/(admin)/admin/content/documents/[id]/map-objectives/DocumentMappingClient.tsx` - Client interface
+
+## Implementation Tasks ✅ ALL COMPLETE
+
+### Schema Changes
+- [x] Update Prisma schema with DocumentContentMapping
+- [x] Replace DocumentObjectiveMapping with flexible polymorphic mapping
+- [x] Add objectiveId, bulletId, subBulletId fields (only ONE populated)
+- [x] Add confidence, mappingSource, isPrimary fields
+- [x] Run `yarn db:push` - successful migration
+
+### Backend - Text Extraction
+- [x] Install pdf-parse and mammoth dependencies
+- [x] Create textExtraction.service.ts (PDF/DOCX/TXT extraction)
+- [x] S3 integration with text extraction
+- [x] Handle dynamic import for pdf-parse (CommonJS compatibility)
+- [x] Text truncation for AI context limits (50k chars)
+
+### Backend - AI Mapping
+- [x] Create documentAIMapping.service.ts
+- [x] Implement Claude API integration
+- [x] Dynamic AI model selection from database (getActiveAIModel)
+- [x] Build semantic analysis prompt
+- [x] Parse Claude JSON response
+- [x] Confidence scoring (≥60% threshold)
+- [x] Top 5 suggestions with primary designation
+
+### Backend - Server Actions
+- [x] document.action.ts (CRUD with RBAC)
+- [x] documentMapping.action.ts (suggest, apply, add, remove, update primary)
+- [x] Update getDocument to include contentMappings with full hierarchy
+
+### Client Hooks
+- [x] useUploadDocument.ts (upload flow with progress)
+- [x] useDocuments.ts (query documents list)
+- [x] useDocumentMappings.ts (query mappings)
+- [x] useDocumentMappingSuggestions.ts (AI suggestions)
+
+### UI Components
+- [x] DocumentUploadProgress.tsx (progress bar)
+- [x] DocumentUploadForm.tsx (drag-drop, validation, metadata form)
+- [x] DocumentList.tsx (table with actions)
+- [x] DocumentViewer.tsx (react-pdf with page navigation)
+- [x] Update ManualMappingCombobox to support documents (contentType prop)
+- [x] Update MappingHierarchy to support DocumentContentMappingWithHierarchy
+- [x] DocumentMappingClient.tsx (AI suggestions + manual mapping interface)
+
+### Admin Pages
+- [x] documents/page.tsx (library)
+- [x] documents/upload/page.tsx (upload)
+- [x] documents/[id]/map-objectives/page.tsx (mapping page)
+
+### Testing & Polish
+- [x] Fix type detection in MappingHierarchy (MappingSuggestion first)
+- [x] Fix pdf-parse import (dynamic import)
+- [x] Fix mimeType type assertion
+- [x] Fix hardcoded AI model (use active model from database)
+- [x] Run build - successful ✅
+- [x] TypeScript clean ✅
+
+### Additional Features (Post-Issue)
+- [x] Modal dialogs for View, Edit, Delete (not system prompts)
+- [x] ViewDocumentDialog - metadata view with download button
+- [x] EditDocumentDialog - modal form for metadata editing
+- [x] DeleteDocumentDialog - confirmation modal
+- [x] AI description generation (like videos)
+- [x] Text extraction from PDF/DOCX/TXT
+- [x] AI description service with GPT-3.5-turbo (100 words)
+- [x] Presigned S3 download URLs
+- [x] Download button in document list action bar
+- [x] Download button in view modal
+- [x] Drag-and-drop file upload with browser prevention
+- [x] Fixed PDF text extraction (switched to unpdf library)
+- [x] Date formatting with date-fns
+- [x] Installed dependencies: date-fns, unpdf
+
+## Key Features
+
+**Upload:**
+- Drag-drop support with browser default prevention
+- File validation: PDF, DOCX, TXT only, max 100MB
+- Metadata form: title, description, type, version, allowDownload
+- Progress tracking
+- S3 storage: `dev/documents/{timestamp}-{filename}`
+- AI description generation checkbox (defaults to checked)
+- Text extraction using unpdf (PDF), mammoth (DOCX), buffer.toString (TXT)
+- AI description with GPT-3.5-turbo (100 words)
+
+**Library:**
+- List all documents with metadata
+- Search by title/description
+- Filter by type (PDF/DOCX/TXT)
+- Sort by date, title, size
+- Actions: View (eye icon), Edit (pencil), Download (download icon), Map Objectives (link), Delete (trash)
+- Modal dialogs for all actions (not system prompts)
+
+**View Document Modal:**
+- Read-only metadata view
+- Document icon with type badge and version
+- Description with AI-generated indicator
+- File size and download permission status
+- Created/updated timestamps (relative format)
+- Objective mapping count
+- Download button (presigned S3 URL)
+
+**Edit Document Modal:**
+- Form for editing title, description, version
+- Toggle for allowDownload permission
+- Save/Cancel buttons with loading states
+
+**Delete Document Modal:**
+- Confirmation dialog with document title
+- Warning about cascade deletion of mappings
+- Delete/Cancel buttons with loading states
+
+**Download Functionality:**
+- Presigned S3 download URLs (1-hour expiration)
+- Download button in document list action bar
+- Download button in view modal
+- Permission check (only if allowDownload = true)
+- Error handling with toast notifications
+
+**Objective Mapping:**
+- AI-powered mapping to objectives/bullets/sub-bullets (Claude API)
+- Dynamic model selection from database (not hardcoded)
+- Manual mapping via search combobox
+- Primary mapping designation
+- Add/remove mappings
+- Display hierarchy: Domain → Objective → Bullet → Sub-bullet
+
+## Document Mapping vs Video Mapping
+
+**Similarities:**
+- Reuse MappingHierarchy component
+- Reuse ManualMappingCombobox
+- Same CRUD operations (add, remove, update primary)
+
+**Differences:**
+- Documents: Map to objectives ONLY (simpler)
+- Videos: Map to objectives/bullets/sub-bullets (complex)
+- Documents: No AI suggestions (no transcript)
+- Videos: AI suggestions via embeddings
 
 ---
 

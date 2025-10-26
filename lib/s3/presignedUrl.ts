@@ -1,10 +1,10 @@
 /**
  * S3 Pre-signed URL Generation
  *
- * Generate pre-signed URLs for secure client-side uploads to S3.
+ * Generate pre-signed URLs for secure client-side uploads and downloads to S3.
  */
 
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { s3Client, S3_BUCKET_NAME, generateS3Key, getS3PublicUrl } from "./config";
 import type { PresignedUploadResponse } from "@/modules/content/types/video.types";
@@ -46,6 +46,29 @@ export async function generatePresignedUploadUrl(
     s3Key,
     publicUrl,
   };
+}
+
+/**
+ * Generate pre-signed URL for downloading a file from S3
+ *
+ * @param s3Key - S3 object key
+ * @param expiresIn - URL expiration time in seconds (default: 1 hour)
+ * @returns Pre-signed download URL
+ */
+export async function generatePresignedDownloadUrl(
+  s3Key: string,
+  expiresIn: number = 3600
+): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: S3_BUCKET_NAME,
+    Key: s3Key,
+  });
+
+  const downloadUrl = await getSignedUrl(s3Client, command, {
+    expiresIn,
+  });
+
+  return downloadUrl;
 }
 
 /**

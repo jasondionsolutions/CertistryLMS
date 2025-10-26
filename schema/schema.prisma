@@ -139,7 +139,7 @@ model CertificationObjective {
   // Relationships
   bullets       Bullet[]
   videoContentMappings VideoContentMapping[]
-  documentMappings DocumentObjectiveMapping[]
+  documentContentMappings DocumentContentMapping[]
   questions     Question[]
   pbqs          PBQ[]
   progress      StudentProgress[]
@@ -168,6 +168,7 @@ model Bullet {
   // Relationships
   subBullets SubBullet[]
   videoContentMappings VideoContentMapping[]
+  documentContentMappings DocumentContentMapping[]
 
   @@unique([objectiveId, order])
   @@index([objectiveId])
@@ -191,6 +192,7 @@ model SubBullet {
 
   // Relationships
   videoContentMappings VideoContentMapping[]
+  documentContentMappings DocumentContentMapping[]
 
   @@unique([bulletId, order])
   @@index([bulletId])
@@ -305,6 +307,7 @@ model Document {
   fileSize    Int? @map("file_size") // File size in bytes
   mimeType    String? @map("mime_type") // application/pdf, etc.
   version     Int @default(1) // Document versioning
+  aiDescriptionGenerated Boolean @default(false) @map("ai_description_generated") // Track if description was AI-generated
 
   // Upload tracking
   uploadedBy  String? @map("uploaded_by") // User ID who uploaded
@@ -317,7 +320,7 @@ model Document {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relationships
-  objectiveMappings DocumentObjectiveMapping[]
+  contentMappings DocumentContentMapping[]
 
   @@index([s3Key])
   @@index([uploadedBy])
@@ -326,23 +329,33 @@ model Document {
   @@map("documents")
 }
 
-model DocumentObjectiveMapping {
-  id          String @id @default(cuid())
-  documentId  String @map("document_id")
-  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+model DocumentContentMapping {
+  id      String @id @default(cuid())
+  documentId String @map("document_id")
+  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
-  objectiveId String @map("objective_id")
-  objective   CertificationObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  // Link to ANY level (only ONE will be populated)
+  objectiveId String? @map("objective_id")
+  bulletId    String? @map("bullet_id")
+  subBulletId String? @map("sub_bullet_id")
+
+  objective   CertificationObjective? @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  bullet      Bullet?                 @relation(fields: [bulletId], references: [id], onDelete: Cascade)
+  subBullet   SubBullet?              @relation(fields: [subBulletId], references: [id], onDelete: Cascade)
 
   // Mapping Metadata
-  isPrimary   Boolean @default(false) @map("is_primary") // Is this the main objective for this document?
+  isPrimary      Boolean @default(false) @map("is_primary") // Is this the primary content for this document?
+  confidence     Float   @default(1.0)  // AI confidence score (0.0-1.0, 1.0 for manual)
+  mappingSource  String  @default("manual") @map("mapping_source") // "ai_suggested" | "ai_confirmed" | "manual"
 
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  @@unique([documentId, objectiveId])
   @@index([documentId])
   @@index([objectiveId])
-  @@map("document_objective_mappings")
+  @@index([bulletId])
+  @@index([subBulletId])
+  @@index([mappingSource])
+  @@map("document_content_mappings")
 }
 
 // =============================================================================

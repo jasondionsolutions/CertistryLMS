@@ -1,7 +1,7 @@
 /**
- * VideoMappingClient Component
+ * DocumentMappingClient Component
  *
- * Client-side interactive mapping interface
+ * Client-side interactive mapping interface for documents
  */
 
 "use client";
@@ -11,17 +11,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { useSuggestMappings } from "@/modules/content/hooks/useMappingSuggestions";
-import { useApplyMappings } from "@/modules/content/hooks/useApplyMappings";
-import { useVideoMappings } from "@/modules/content/hooks/useVideoMappings";
+import { useSuggestDocumentMappings } from "@/modules/content/hooks/useDocumentMappingSuggestions";
 import {
-  useRemoveMapping,
-  useUpdatePrimaryMapping,
-} from "@/modules/content/hooks/useManualMapping";
+  useApplyDocumentMappings,
+  useDocumentMappings,
+  useRemoveDocumentMapping,
+  useUpdatePrimaryDocumentMapping,
+} from "@/modules/content/hooks/useDocumentMappings";
 import { SuggestedMappingCard } from "@/modules/content/ui/SuggestedMappingCard";
 import { ManualMappingCombobox } from "@/modules/content/ui/ManualMappingCombobox";
 import { MappingHierarchy } from "@/modules/content/ui/MappingHierarchy";
-import type { MappingSuggestion } from "@/modules/content/types/mapping.types";
+import type { DocumentMappingSuggestion } from "@/modules/content/types/documentMapping.types";
 import {
   Sparkles,
   Loader2,
@@ -29,21 +29,18 @@ import {
   Plus,
   Trash2,
   Star,
-  AlertCircle,
 } from "lucide-react";
 
-interface VideoMappingClientProps {
-  videoId: string;
+interface DocumentMappingClientProps {
+  documentId: string;
   certificationId: string;
-  hasTranscript: boolean;
 }
 
-export function VideoMappingClient({
-  videoId,
+export function DocumentMappingClient({
+  documentId,
   certificationId,
-  hasTranscript,
-}: VideoMappingClientProps) {
-  const [suggestions, setSuggestions] = useState<MappingSuggestion[]>([]);
+}: DocumentMappingClientProps) {
+  const [suggestions, setSuggestions] = useState<DocumentMappingSuggestion[]>([]);
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<number>>(
     new Set()
   );
@@ -53,18 +50,18 @@ export function VideoMappingClient({
 
   // Hooks
   const { mutate: generateSuggestions, isPending: isGenerating } =
-    useSuggestMappings();
-  const { mutate: applyMappings, isPending: isApplying } = useApplyMappings();
+    useSuggestDocumentMappings();
+  const { mutate: applyMappings, isPending: isApplying } = useApplyDocumentMappings();
   const { data: mappingsSummary, isLoading: isLoadingMappings } =
-    useVideoMappings(videoId);
-  const { mutate: removeMapping, isPending: isRemoving } = useRemoveMapping();
+    useDocumentMappings(documentId);
+  const { mutate: removeMapping, isPending: isRemoving } = useRemoveDocumentMapping();
   const { mutate: updatePrimary, isPending: isUpdatingPrimary } =
-    useUpdatePrimaryMapping();
+    useUpdatePrimaryDocumentMapping();
 
   // Handle generate suggestions
   const handleGenerateSuggestions = () => {
     generateSuggestions(
-      { videoId, certificationId },
+      { documentId, certificationId },
       {
         onSuccess: (data) => {
           setSuggestions(data);
@@ -97,7 +94,7 @@ export function VideoMappingClient({
   // Handle set primary suggestion
   const handleSetPrimarySuggestion = (index: number) => {
     setPrimarySuggestionIndex(index);
-    // Ensure it's selected
+    // Ensure it&apos;s selected
     setSelectedSuggestions((prev) => new Set(prev).add(index));
   };
 
@@ -116,7 +113,7 @@ export function VideoMappingClient({
       }));
 
     applyMappings(
-      { videoId, mappings: selectedMappings },
+      { documentId, mappings: selectedMappings },
       {
         onSuccess: () => {
           setSuggestions([]);
@@ -129,12 +126,12 @@ export function VideoMappingClient({
 
   // Handle remove mapping
   const handleRemoveMapping = (mappingId: string) => {
-    removeMapping({ mappingId, videoId });
+    removeMapping({ mappingId, documentId });
   };
 
   // Handle update primary mapping
   const handleUpdatePrimary = (mappingId: string) => {
-    updatePrimary({ videoId, mappingId });
+    updatePrimary({ documentId, mappingId });
   };
 
   const hasSelectedSuggestions = selectedSuggestions.size > 0;
@@ -142,109 +139,91 @@ export function VideoMappingClient({
   return (
     <div className="space-y-6">
       {/* AI Suggestions Section */}
-      {hasTranscript && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  AI Suggested Mappings
-                </CardTitle>
-                <CardDescription>
-                  Automatically generated suggestions based on video transcript
-                </CardDescription>
-              </div>
-              <Button
-                onClick={handleGenerateSuggestions}
-                disabled={isGenerating || suggestions.length > 0}
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : suggestions.length > 0 ? (
-                  <>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Suggestions Generated
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Generate Suggestions
-                  </>
-                )}
-              </Button>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                AI Suggested Mappings
+              </CardTitle>
+              <CardDescription>
+                Claude AI analyzes document content and suggests relevant objectives
+              </CardDescription>
             </div>
-          </CardHeader>
-
-          {suggestions.length > 0 && (
-            <CardContent className="space-y-4">
-              {/* Suggestions list */}
-              <div className="space-y-3">
-                {suggestions.map((suggestion, index) => (
-                  <SuggestedMappingCard
-                    key={index}
-                    suggestion={suggestion}
-                    isSelected={selectedSuggestions.has(index)}
-                    onToggleSelect={(selected) =>
-                      handleToggleSuggestion(index, selected)
-                    }
-                    onSetPrimary={() => handleSetPrimarySuggestion(index)}
-                    isPrimary={primarySuggestionIndex === index}
-                  />
-                ))}
-              </div>
-
-              {/* Apply button */}
-              {hasSelectedSuggestions && (
+            <Button
+              onClick={handleGenerateSuggestions}
+              disabled={isGenerating || suggestions.length > 0}
+            >
+              {isGenerating ? (
                 <>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">
-                      {selectedSuggestions.size} mapping
-                      {selectedSuggestions.size !== 1 ? "s" : ""} selected
-                    </p>
-                    <Button
-                      onClick={handleApplySuggestions}
-                      disabled={isApplying}
-                    >
-                      {isApplying ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Applying...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Apply Selected Mappings
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : suggestions.length > 0 ? (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Suggestions Generated
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Generate Suggestions
                 </>
               )}
-            </CardContent>
-          )}
-        </Card>
-      )}
+            </Button>
+          </div>
+        </CardHeader>
 
-      {/* No Transcript Warning */}
-      {!hasTranscript && (
-        <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-yellow-900 dark:text-yellow-100">
-              <AlertCircle className="h-5 w-5" />
-              No Transcript Available
-            </CardTitle>
-            <CardDescription className="text-yellow-800 dark:text-yellow-200">
-              AI suggestions require a completed transcript. You can add
-              mappings manually below.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
+        {suggestions.length > 0 && (
+          <CardContent className="space-y-4">
+            {/* Suggestions list */}
+            <div className="space-y-3">
+              {suggestions.map((suggestion, index) => (
+                <SuggestedMappingCard
+                  key={index}
+                  suggestion={suggestion}
+                  isSelected={selectedSuggestions.has(index)}
+                  onToggleSelect={(selected) =>
+                    handleToggleSuggestion(index, selected)
+                  }
+                  onSetPrimary={() => handleSetPrimarySuggestion(index)}
+                  isPrimary={primarySuggestionIndex === index}
+                />
+              ))}
+            </div>
+
+            {/* Apply button */}
+            {hasSelectedSuggestions && (
+              <>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {selectedSuggestions.size} mapping
+                    {selectedSuggestions.size !== 1 ? "s" : ""} selected
+                  </p>
+                  <Button
+                    onClick={handleApplySuggestions}
+                    disabled={isApplying}
+                  >
+                    {isApplying ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Applying...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Apply Selected Mappings
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        )}
+      </Card>
 
       {/* Manual Mapping Section */}
       <Card>
@@ -259,9 +238,9 @@ export function VideoMappingClient({
         </CardHeader>
         <CardContent>
           <ManualMappingCombobox
-            contentId={videoId}
+            contentId={documentId}
             certificationId={certificationId}
-            contentType="video"
+            contentType="document"
           />
         </CardContent>
       </Card>

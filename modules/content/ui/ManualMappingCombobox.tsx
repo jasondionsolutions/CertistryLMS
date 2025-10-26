@@ -6,25 +6,27 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSearchContent } from "../hooks/useSearchContent";
 import { useAddManualMapping } from "../hooks/useManualMapping";
+import { useAddDocumentMapping } from "../hooks/useDocumentMappings";
 import type { ContentSearchResult } from "../types/mapping.types";
 import { Search, Plus, Loader2 } from "lucide-react";
 
 interface ManualMappingComboboxProps {
-  videoId: string;
+  contentId: string; // videoId or documentId
   certificationId: string;
+  contentType: "video" | "document";
 }
 
 export function ManualMappingCombobox({
-  videoId,
+  contentId,
   certificationId,
+  contentType,
 }: ManualMappingComboboxProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -33,10 +35,22 @@ export function ManualMappingCombobox({
     query,
     certificationId
   );
-  const { mutate: addMapping, isPending: isAdding } = useAddManualMapping();
+
+  // Use appropriate hook based on content type
+  const { mutate: addVideoMapping, isPending: isAddingVideo } = useAddManualMapping();
+  const { mutate: addDocMapping, isPending: isAddingDoc } = useAddDocumentMapping();
+
+  const isAdding = contentType === "video" ? isAddingVideo : isAddingDoc;
 
   const handleSelect = (result: ContentSearchResult) => {
-    const input: any = { videoId, isPrimary: false };
+    const input: any = { isPrimary: false };
+
+    // Set content ID based on type
+    if (contentType === "video") {
+      input.videoId = contentId;
+    } else {
+      input.documentId = contentId;
+    }
 
     // Set the appropriate ID based on content type
     if (result.type === "objective") {
@@ -47,12 +61,22 @@ export function ManualMappingCombobox({
       input.subBulletId = result.id;
     }
 
-    addMapping(input, {
-      onSuccess: () => {
-        setQuery("");
-        setIsOpen(false);
-      },
-    });
+    // Call appropriate mutation
+    if (contentType === "video") {
+      addVideoMapping(input, {
+        onSuccess: () => {
+          setQuery("");
+          setIsOpen(false);
+        },
+      });
+    } else {
+      addDocMapping(input, {
+        onSuccess: () => {
+          setQuery("");
+          setIsOpen(false);
+        },
+      });
+    }
   };
 
   const handleInputChange = (value: string) => {
