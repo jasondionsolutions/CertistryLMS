@@ -345,6 +345,286 @@ export async function getTaskProgressWithObjectives(
   }
 }
 
+export async function getActiveTasksForDashboard(): Promise<{
+  success: boolean;
+  data?: {
+    tasks: SerializedQuestionTask[];
+    summary: TaskProgressSummary;
+  };
+  error?: string;
+}> {
+  try {
+    // Get all question tasks with active or paused status
+    const tasks = await prisma.questionTask.findMany({
+      where: {
+        status: {
+          in: ["active", "paused"],
+        },
+      },
+      include: {
+        certification: {
+          select: {
+            name: true,
+            code: true,
+          },
+        },
+      },
+      orderBy: [
+        { status: "asc" }, // active first
+        { createdAt: "desc" },
+      ],
+    });
+
+    // Get overall statistics
+    const [totalTasks, activeTasks, completedTasks] = await Promise.all([
+      prisma.questionTask.count(),
+      prisma.questionTask.count({ where: { status: "active" } }),
+      prisma.questionTask.count({ where: { status: "completed" } }),
+    ]);
+
+    // Serialize tasks with progress calculation
+    const serializedTasks: SerializedQuestionTask[] = tasks.map((task) => {
+      const progress =
+        task.targetTotal > 0
+          ? Math.round((task.completedTotal / task.targetTotal) * 100)
+          : 0;
+
+      return {
+        id: task.id,
+        name: task.name,
+        certificationId: task.certificationId,
+        certificationName: task.certification.name,
+        certificationCode: task.certification.code,
+        targetTotal: task.targetTotal,
+        completedTotal: task.completedTotal,
+        countExisting: task.countExisting,
+        status: task.status,
+        createdBy: task.createdBy,
+        objectives: task.objectives as Record<string, number>,
+        createdAt: task.createdAt.toISOString(),
+        updatedAt: task.updatedAt.toISOString(),
+        progress,
+      };
+    });
+
+    // Calculate summary statistics
+    const totalTargetQuestions = serializedTasks.reduce(
+      (sum, task) => sum + task.targetTotal,
+      0
+    );
+    const totalCompletedQuestions = serializedTasks.reduce(
+      (sum, task) => sum + task.completedTotal,
+      0
+    );
+    const overallProgress =
+      totalTargetQuestions > 0
+        ? Math.round((totalCompletedQuestions / totalTargetQuestions) * 100)
+        : 0;
+
+    const summary: TaskProgressSummary = {
+      totalTasks,
+      activeTasks,
+      completedTasks,
+      totalTargetQuestions,
+      totalCompletedQuestions,
+      overallProgress,
+    };
+
+    return {
+      success: true,
+      data: {
+        tasks: serializedTasks,
+        summary,
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching active tasks for dashboard:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch active tasks",
+    };
+  }
+}
+
+export async function calculateQuestionDistribution(
+  certificationId: string
+): Promise<{
+  success: boolean;
+  data?: {
+    totalQuestions: number;
+    domainDistribution: Record<string, { existing: number; target: number; needed: number }>;
+    objectiveDistribution: Record<string, { existing: number; target: number; needed: number; domainNumber: string }>;
+  };
+  error?: string;
+}> {
+  try {
+    // Get certification with domains and objectives
+    const certification = await prisma.certification.findUnique({
+      where: { id: certificationId },
+      include: {
+        domains: {
+          include: {
+            objectives: true,
+          },
+        },
+      },
+    });
+
+    if (!certification) {
+      return {
+        success: false,
+        error: "Certification not found",
+      };
+    }
+
+    // Count total questions for this certification
+    const totalQuestions = await prisma.question.count({
+      where: {
+        OR: [
+          {
+            objective: {
+              domain: {
+                certificationId,
+              },
+            },
+          },
+          {
+            bullet: {
+              objective: {
+                domain: {
+                  certificationId,
+                },
+              },
+            },
+          },
+          {
+            subBullet: {
+              bullet: {
+                objective: {
+                  domain: {
+                    certificationId,
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    // Build distribution maps
+    const domainDistribution: Record<
+      string,
+      { existing: number; target: number; needed: number }
+    > = {};
+    const objectiveDistribution: Record<
+      string,
+      { existing: number; target: number; needed: number; domainNumber: string }
+    > = {};
+
+    // Initialize with certification domains structure
+    for (const domain of certification.domains) {
+      const domainKey = domain.name; // Use domain name as key
+
+      domainDistribution[domainKey] = {
+        existing: 0,
+        target: 0, // Could add targetQuestions field to Domain model if needed
+        needed: 0,
+      };
+
+      // Initialize objectives within domain
+      for (const objective of domain.objectives) {
+        objectiveDistribution[objective.code] = {
+          existing: 0,
+          target: 0, // Could add targetQuestions field to Objective model if needed
+          needed: 0,
+          domainNumber: domainKey,
+        };
+      }
+    }
+
+    // Get existing question counts per objective
+    const questionCounts = await prisma.question.groupBy({
+      by: ["objectiveId"],
+      where: {
+        objectiveId: {
+          not: null,
+        },
+        objective: {
+          domain: {
+            certificationId,
+          },
+        },
+      },
+      _count: {
+        _all: true,
+      },
+    });
+
+    // Update distribution with actual counts
+    for (const { objectiveId, _count } of questionCounts) {
+      if (!objectiveId) continue;
+
+      const count = _count._all;
+
+      // Find the objective to get its code and domain
+      const objective = certification.domains
+        .flatMap((d) => d.objectives)
+        .find((obj) => obj.id === objectiveId);
+
+      if (objective) {
+        const domain = certification.domains.find(
+          (d) => d.id === objective.domainId
+        );
+
+        if (domain) {
+          const domainKey = domain.name; // Use domain name as key
+
+          // Update objective distribution
+          if (objectiveDistribution[objective.code]) {
+            objectiveDistribution[objective.code].existing = count;
+            objectiveDistribution[objective.code].needed = Math.max(
+              0,
+              objectiveDistribution[objective.code].target - count
+            );
+          }
+
+          // Update domain distribution
+          if (domainDistribution[domainKey]) {
+            domainDistribution[domainKey].existing += count;
+            domainDistribution[domainKey].needed = Math.max(
+              0,
+              domainDistribution[domainKey].target -
+                domainDistribution[domainKey].existing
+            );
+          }
+        }
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        totalQuestions,
+        domainDistribution,
+        objectiveDistribution,
+      },
+    };
+  } catch (error) {
+    console.error("Error calculating question distribution:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to calculate distribution",
+    };
+  }
+}
+
 // ============================================================================
 // UPDATE OPERATIONS
 // ============================================================================

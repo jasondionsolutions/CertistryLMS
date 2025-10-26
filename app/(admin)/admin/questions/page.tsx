@@ -6,13 +6,13 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-// import { useQuestionManagement } from "@/modules/admin/questions/hooks/useQuestionManagement"; // TODO: Add loadActiveTasksForDashboard method
+import { useQuestionManagement } from "@/modules/admin/questions/hooks/useQuestionManagement";
 import { useAdminQuestions } from "@/modules/admin/questions/hooks/useAdminQuestions";
 import {
   type SerializedQuestionWithHierarchy
 } from "@/modules/admin/questions/types";
 import { listCertifications } from "@/modules/certifications/serverActions/certification.action";
-// import { TaskWorkspace } from "@/modules/admin/questions/ui"; // TODO: Port TaskWorkspace
+import { TaskWorkspace } from "@/modules/admin/questions/ui";
 import { AdminAuthWrapper } from "@/modules/admin/shared/ui";
 import { logger } from "@/lib/utils/secure-logger";
 import { ErrorBoundary } from "@/modules/shared/ui/error-boundary";
@@ -51,10 +51,12 @@ type QuestionWithHierarchyData = SerializedQuestionWithHierarchy;
 interface ActiveTask {
   id: string;
   name: string;
+  certificationId: string;
+  certificationName: string;
+  status: string;
   progress: number;
-  completedQuestions: number;
-  totalQuestions: number;
-  createdAt: string;
+  completedTotal: number;
+  targetTotal: number;
 }
 
 interface Certification {
@@ -78,6 +80,7 @@ interface Objective {
 
 function QuestionsDashboardPageContent() {
   const { deleteQuestion, bulkDeleteQuestions } = useAdminQuestions();
+  const { loadActiveTasksForDashboard } = useQuestionManagement();
   const [questions, setQuestions] = useState<QuestionWithHierarchyData[]>([]);
   const [certifications, setCertifications] = useState<Certification[]>([]);
   const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
@@ -104,8 +107,21 @@ function QuestionsDashboardPageContent() {
         const certificationsResult = await listCertifications();
         const certificationsData = certificationsResult.success && certificationsResult.data ? certificationsResult.data : [];
 
-        // TODO: Load tasks using hook when loadActiveTasksForDashboard is available
-        const tasksData: ActiveTask[] = [];
+        // Load tasks using hook
+        const tasksResult = await loadActiveTasksForDashboard();
+        const tasksData: ActiveTask[] = tasksResult.success && tasksResult.data?.tasks
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ? tasksResult.data.tasks.map((task: any): ActiveTask => ({
+              id: task.id,
+              name: task.name,
+              certificationId: task.certificationId,
+              certificationName: task.certificationName || 'Unknown',
+              status: task.status,
+              targetTotal: task.targetTotal,
+              completedTotal: task.completedTotal,
+              progress: task.progress
+            }))
+          : [];
 
         // Validate data format
         if (!Array.isArray(questionsData)) {
@@ -190,7 +206,24 @@ function QuestionsDashboardPageContent() {
 
       if (questionsData) {
         setQuestions(questionsData);
-        // TODO: Load tasks when hook is available
+
+        // Reload tasks
+        const tasksResult = await loadActiveTasksForDashboard();
+        if (tasksResult.success && tasksResult.data?.tasks) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const tasksData = tasksResult.data.tasks.map((task: any): ActiveTask => ({
+            id: task.id,
+            name: task.name,
+            certificationId: task.certificationId,
+            certificationName: task.certificationName || 'Unknown',
+            status: task.status,
+            targetTotal: task.targetTotal,
+            completedTotal: task.completedTotal,
+            progress: task.progress
+          }));
+          setActiveTasks(tasksData);
+        }
+
         return questionsData;
       }
 
@@ -199,7 +232,7 @@ function QuestionsDashboardPageContent() {
       logger.error("Error refreshing data", error, { component: 'AdminQuestions', action: 'refresh' });
       return [];
     }
-  }, []);
+  }, [loadActiveTasksForDashboard]);
 
   const tableConfig: AdminTableConfig<SerializedQuestionWithHierarchy, FilterState> = useMemo(() => ({
     getItemId: (item) => item.id,
@@ -571,15 +604,14 @@ function QuestionsDashboardPageContent() {
   }, [tableActions]);
 
   // If task workspace is open, show it instead of main dashboard
-  // TODO: Uncomment when TaskWorkspace is ported
-  // if (selectedTaskId) {
-  //   return (
-  //     <TaskWorkspace
-  //       taskId={selectedTaskId}
-  //       onBack={closeTaskWorkspace}
-  //     />
-  //   );
-  // }
+  if (selectedTaskId) {
+    return (
+      <TaskWorkspace
+        taskId={selectedTaskId}
+        onBack={closeTaskWorkspace}
+      />
+    );
+  }
 
   return (
     <ErrorBoundary level="page">
@@ -682,11 +714,12 @@ function QuestionsDashboardPageContent() {
                                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                   <span className="flex items-center gap-1">
                                     <TrendingUp className="w-3 h-3" />
-                                    {task.completedQuestions}/{task.totalQuestions}
+                                    {task.completedTotal}/{task.targetTotal}
                                   </span>
                                   <span className="flex items-center gap-1">
-                                    <Clock className="w-3 h-3" />
-                                    {new Date(task.createdAt).toLocaleDateString()}
+                                    <Badge variant="outline" className="text-xs">
+                                      {task.status}
+                                    </Badge>
                                   </span>
                                 </div>
                               </div>

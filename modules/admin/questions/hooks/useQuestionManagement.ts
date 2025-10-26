@@ -8,12 +8,15 @@ import {
   getQuestionTaskById,
   getTaskProgressWithObjectives,
   updateQuestionTask,
-  createQuestionTask
+  createQuestionTask,
+  getActiveTasksForDashboard,
+  calculateQuestionDistribution
 } from '../serverActions/questionTask.action';
 import type {
   SerializedQuestionTask,
   TaskProgressWithObjectives,
-  CreateQuestionTaskData
+  CreateQuestionTaskData,
+  TaskProgressSummary
 } from '../types';
 import { createQuestion } from '../serverActions/question.action';
 import type { QuestionData } from '../types';
@@ -34,6 +37,8 @@ export interface UseQuestionManagementReturn {
   loadTaskById: (taskId: string) => Promise<ApiResult<SerializedQuestionTask>>;
   loadTaskProgress: (taskId: string) => Promise<ApiResult<TaskProgressWithObjectives>>;
   updateTaskStatus: (taskId: string, status: "active" | "completed" | "paused") => Promise<ApiResult<boolean>>;
+  loadActiveTasksForDashboard: () => Promise<ApiResult<{ tasks: SerializedQuestionTask[]; summary: TaskProgressSummary }>>;
+  calculateDistribution: (certificationId: string) => Promise<ApiResult<{ totalQuestions: number; domainDistribution: Record<string, { existing: number; target: number; needed: number }>; objectiveDistribution: Record<string, { existing: number; target: number; needed: number; domainNumber: string }> }>>;
   createTask: (taskData: CreateQuestionTaskData) => Promise<{success: boolean; data?: SerializedQuestionTask; error?: string}>;
 
   // Question operations
@@ -157,6 +162,51 @@ export function useQuestionManagement(): UseQuestionManagementReturn {
     );
   }, []);
 
+  const loadActiveTasksForDashboard = useCallback(async (): Promise<ApiResult<{ tasks: SerializedQuestionTask[]; summary: TaskProgressSummary }>> => {
+    // SECURE ARCHITECTURE: Standardized error handling
+    return executeWithErrorHandling(
+      async () => {
+        const result = await getActiveTasksForDashboard();
+
+        if (!result.success || !result.data) {
+          throw new Error(result.error || 'Failed to load active tasks');
+        }
+
+        return result.data;
+      },
+      {
+        errorConfig: {
+          operationName: 'Load Active Tasks for Dashboard',
+          showToast: false, // Dashboard loading fails silently
+          logToConsole: true
+        }
+      }
+    );
+  }, []);
+
+  const calculateDistribution = useCallback(async (certificationId: string): Promise<ApiResult<{ totalQuestions: number; domainDistribution: Record<string, { existing: number; target: number; needed: number }>; objectiveDistribution: Record<string, { existing: number; target: number; needed: number; domainNumber: string }> }>> => {
+    // SECURE ARCHITECTURE: Standardized error handling
+    return executeWithErrorHandling(
+      async () => {
+        const result = await calculateQuestionDistribution(certificationId);
+
+        if (!result.success || !result.data) {
+          throw new Error(result.error || 'Failed to calculate question distribution');
+        }
+
+        return result.data;
+      },
+      {
+        errorConfig: {
+          operationName: 'Calculate Question Distribution',
+          showToast: true,
+          logToConsole: true,
+          context: { certificationId }
+        }
+      }
+    );
+  }, []);
+
   const createTask = useCallback(async (taskData: CreateQuestionTaskData): Promise<{success: boolean; data?: SerializedQuestionTask; error?: string}> => {
     setLoading(true);
     try {
@@ -185,6 +235,8 @@ export function useQuestionManagement(): UseQuestionManagementReturn {
     loadTaskById,
     loadTaskProgress,
     updateTaskStatus,
+    loadActiveTasksForDashboard,
+    calculateDistribution,
     createTask,
     saveQuestion,
   };
