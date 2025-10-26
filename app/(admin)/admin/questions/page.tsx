@@ -648,7 +648,7 @@ function QuestionsDashboardPageContent() {
                   Create Question Task
                 </Button>
               </Link>
-              <Link href="/admin/questions/new/edit">
+              <Link href="/admin/questions/create">
                 <Button variant="outline" className="flex items-center gap-2">
                   <Plus className="w-4 h-4" />
                   Add Single Question
