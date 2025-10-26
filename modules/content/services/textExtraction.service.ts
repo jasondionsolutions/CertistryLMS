@@ -144,3 +144,56 @@ export function truncateText(text: string, maxLength: number = 100000): string {
   // Truncate and add ellipsis
   return text.substring(0, maxLength) + "\n\n[... document truncated ...]";
 }
+
+/**
+ * Extract a preview (first N words) from text for display purposes
+ *
+ * @param text - Full text content
+ * @param wordCount - Number of words to include in preview (default: 500)
+ * @returns Preview text
+ */
+export function extractTextPreview(
+  text: string,
+  wordCount: number = 500
+): string {
+  if (!text || text.trim().length === 0) {
+    return "";
+  }
+
+  // Split by whitespace and take first N words
+  const words = text.trim().split(/\s+/);
+
+  if (words.length <= wordCount) {
+    return text;
+  }
+
+  // Join first N words and add ellipsis
+  const preview = words.slice(0, wordCount).join(" ");
+  return preview + "...";
+}
+
+/**
+ * Extract text preview from a document stored in S3
+ * Optimized for quick preview generation (first 500 words)
+ *
+ * @param s3Key - S3 object key
+ * @param mimeType - Document MIME type
+ * @param wordCount - Number of words to include (default: 500)
+ * @returns Preview text
+ */
+export async function extractDocumentPreview(
+  s3Key: string,
+  mimeType: string,
+  wordCount: number = 500
+): Promise<string> {
+  try {
+    // For PDFs, we can't easily extract just first N words without parsing the whole thing
+    // So we extract all text and then truncate
+    const fullText = await extractTextFromDocument(s3Key, mimeType);
+    return extractTextPreview(fullText, wordCount);
+  } catch (error) {
+    console.error("[extractDocumentPreview] Error:", error);
+    // Return empty string instead of throwing to allow preview failures to degrade gracefully
+    return "";
+  }
+}
