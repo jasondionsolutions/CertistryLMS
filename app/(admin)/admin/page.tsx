@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { validateSession } from "@/lib/auth/validateSession";
 import Link from "next/link";
-import { BookOpen, Users, BarChart, FileVideo } from "lucide-react";
+import { BookOpen, Users, BarChart, FileVideo, ClipboardList } from "lucide-react";
 
 /**
  * Admin Dashboard Page
@@ -39,6 +39,14 @@ export default async function AdminDashboardPage() {
       href: "/admin/content",
       color: "text-purple-600 dark:text-purple-400",
       bgColor: "bg-purple-100 dark:bg-purple-950",
+    },
+    {
+      title: "Question Management",
+      description: "Create and manage quiz questions with AI-assisted generation",
+      icon: ClipboardList,
+      href: "/admin/questions",
+      color: "text-orange-600 dark:text-orange-400",
+      bgColor: "bg-orange-100 dark:bg-orange-950",
     },
     {
       title: "User Management",

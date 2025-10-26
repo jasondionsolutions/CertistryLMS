@@ -88,6 +88,7 @@ model Certification {
   learningPaths StudentLearningPath[]
   currentStudents User[] @relation("CurrentCertification")
   videos     Video[] // Videos associated with this certification
+  questionTasks QuestionTask[] // Question creation tasks
 
   @@index([isActive])
   @@index([isArchived])
@@ -169,6 +170,7 @@ model Bullet {
   subBullets SubBullet[]
   videoContentMappings VideoContentMapping[]
   documentContentMappings DocumentContentMapping[]
+  questions   Question[] // Questions mapped to this bullet
 
   @@unique([objectiveId, order])
   @@index([objectiveId])
@@ -193,6 +195,7 @@ model SubBullet {
   // Relationships
   videoContentMappings VideoContentMapping[]
   documentContentMappings DocumentContentMapping[]
+  questions   Question[] // Questions mapped to this sub-bullet
 
   @@unique([bulletId, order])
   @@index([bulletId])
@@ -371,16 +374,25 @@ model Question {
 
   // Question Content
   text        String @db.Text
-  choices     Json   // Array of choice objects
+  choices     Json   // Array of choice objects: { text: string, isCorrect: boolean, explanation?: string }[]
   correctAnswer String @map("correct_answer") // JSON array for multiple_select
   explanation String @db.Text
 
-  // Categorization
-  objectiveId String @map("objective_id")
-  objective   CertificationObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  // Flexible Categorization (map to objective, bullet, OR sub-bullet - only ONE should be populated)
+  objectiveId String? @map("objective_id")
+  bulletId    String? @map("bullet_id")
+  subBulletId String? @map("sub_bullet_id")
+
+  objective   CertificationObjective? @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  bullet      Bullet?                 @relation(fields: [bulletId], references: [id], onDelete: Cascade)
+  subBullet   SubBullet?              @relation(fields: [subBulletId], references: [id], onDelete: Cascade)
 
   // Question Type Tag (from Chapter 5)
   questionType String? @map("question_type") // "scenario", "recall", "best_practice", "exception", "calculation", "sequence", "application"
+
+  // Task Association (optional - for tracking question creation tasks)
+  taskId      String? @map("task_id")
+  task        QuestionTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
@@ -390,10 +402,41 @@ model Question {
   quizAttempts StudentQuizAttempt[]
 
   @@index([objectiveId])
+  @@index([bulletId])
+  @@index([subBulletId])
+  @@index([taskId])
   @@index([difficulty])
   @@index([questionType])
   @@index([isActive])
   @@map("questions")
+}
+
+model QuestionTask {
+  id             String   @id @default(cuid())
+  name           String
+  certificationId String  @map("certification_id")
+  certification   Certification @relation(fields: [certificationId], references: [id], onDelete: Cascade)
+
+  targetTotal    Int     // Total number of questions to create
+  completedTotal Int     @default(0) // Number of questions created
+  countExisting  Boolean // Count existing questions toward target
+  status         TaskStatus
+  createdBy      String  // User ID who created the task
+
+  // Objective targets stored as JSON
+  // Format: { "1.1": 10, "1.2": 5, "2.1": 15 }
+  // Maps objective code -> target question count
+  objectives     Json
+
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  questions      Question[]  // Questions created for this task
+
+  @@index([certificationId])
+  @@index([createdBy])
+  @@map("question_tasks")
 }
 
 model PBQ {
@@ -656,6 +699,46 @@ model AIModel {
   @@index([provider])
   @@index([isActive])
   @@map("ai_models")
+}
+
+// =============================================================================
+// RANDOM NAMES (for AI Question Generation)
+// =============================================================================
+
+model Name {
+  id         String     @id @default(cuid())
+  name       String     @unique
+  gender     Gender
+  popularity Popularity
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  @@index([gender])
+  @@index([popularity])
+  @@index([gender, popularity])
+  @@map("names")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum TaskStatus {
+  active
+  completed
+  paused
+}
+
+enum Gender {
+  male
+  female
+  neutral
+}
+
+enum Popularity {
+  common
+  uncommon
+  rare
 }
 
 // =============================================================================
